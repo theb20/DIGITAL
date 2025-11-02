@@ -4,7 +4,7 @@ export const services = [
   // ═══════════════════════════════════════════════════════════
   // DÉVELOPPEMENT WEB (4 services)
   // ═══════════════════════════════════════════════════════════
-  {
+  { 
   id: 1,
   title: "Site Web Vitrine",
   category: "Développement Web",
@@ -31,7 +31,6 @@ export const services = [
   duration: "2-3 semaines",
   price: "Sur devis",
   featured: true,
-  // Nouveaux champs pour la card
   options: [
     { 
       id: 'basic', 
@@ -60,11 +59,42 @@ export const services = [
   rating: 4.9,
   reviewCount: 342,
   provider: "TechVision Solutions",
+  img_url: "https://i.pinimg.com/1200x/ca/ce/34/cace343fe68869047efd97129b827ec5.jpg",
+  cover_url:"https://i.pinimg.com/736x/c6/62/5e/c6625ea96ae89dbe538956fa085336fa.jpg",
   providerRating: 4.9,
   inStock: true,
   guarantee: true,
   originalPrice: 3000,
-  discount: 17
+  discount: 17,
+   comments: [
+    {
+      id: 1,
+      author: "Sophie Martin",
+      review: "Excellente prestation ! Le site correspond parfaitement à nos attentes. L'équipe a été très professionnelle et à l'écoute.",
+      date: "2024-10-28",
+      rating: 5,
+      likes: 24,
+      dislikes: 0
+    },
+    {
+      id: 2,
+      author: "Thomas Dubois",
+      review: "Très bon rapport qualité-prix. Le délai a été respecté et le résultat est au rendez-vous. Je recommande !",
+      date: "2024-10-25",
+      rating: 5,
+      likes: 18,
+      dislikes: 1
+    },
+    {
+      id: 3,
+      author: "Marie Leclerc",
+      review: "Site moderne et responsive. Formation très claire pour la prise en main. Quelques ajustements ont été nécessaires mais le support a été réactif.",
+      date: "2024-10-20",
+      rating: 4,
+      likes: 12,
+      dislikes: 2
+    }
+  ]
 },
   {
     id: 2,

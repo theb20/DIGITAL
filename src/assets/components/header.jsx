@@ -30,6 +30,9 @@ const Header = ({openPopup}) => {
     const isPrivacyPage = location.pathname === "/privacy";
     const isBlogPage = location.pathname === "/blog";
     const isCardPage = location.pathname === "/card";
+    const isProfilPage = location.pathname === "/profil";
+    const isSubmissionPage = location.pathname === "/submission";
+    const isFollowServicePage = location.pathname === "/followService";
     const isHomePage = location.pathname === "/";
 
     // Fonction pour fermer tous les menus
@@ -72,6 +75,7 @@ const Header = ({openPopup}) => {
      {!isSignPage && !isBlogPage && !isResetPage && (
         <header className="w-full fixed top-0 left-0 z-50 bg-transparent transition-all duration-300">
             {/* ===== Barre supérieure (Desktop uniquement) ===== */}
+            {!isProfilPage && (
             <div className={`hidden xl:flex justify-between backdrop-blur-md items-center px-6 xl:px-12 2xl:px-16 py-3 text-xs ${
               isHomePage 
                 ? 'bg-white/1 text-gray-300' 
@@ -90,9 +94,9 @@ const Header = ({openPopup}) => {
                   {!isHomePage && (
                   <button
                     onClick={toggleDarkMode}
-                    className={`p-2 flex items-center justify-center rounded-lg transition-all ${
+                    className={`p-2 flex items-center justify-center rounded-full transition-all ${
                       darkMode
-                      ? ' text-yellow-400 hover:bg-gray-200'
+                      ? ' text-yellow-400 border-0 hover:bg-yellow-400/50'
                       : ' text-gray-700 hover:bg-gray-200'
                     }`}
                     aria-label="Toggle dark mode"
@@ -100,12 +104,12 @@ const Header = ({openPopup}) => {
                     {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                   </button>
                   )}
-                  <a onClick={() => openPopup('quote')} className=" hover:text-slate-100  cursor-pointer transition-colors dark:hover:text-slate-100">Demander un devis</a>
-                  <a href="#" className="hover:text-slate-100 transition-colors dark:hover:text-slate-100">Suivre ma commande</a>
+                  <a href="/submission" className=" hover:text-black/90  cursor-pointer transition-colors dark:hover:text-slate-100">Demander un devis</a>
+                  <a href="/followService" className="hover:text-black/90 transition-colors dark:hover:text-slate-100">Suivre mon service</a>
                 </div>
             </div>
-
-            {!isBlogPage && !isCardPage && !isPrivacyPage && (
+            )}
+            {!isFollowServicePage && !isSubmissionPage && !isBlogPage && !isCardPage && !isPrivacyPage && (
               <>
                 {/* ===== Barre principale ===== */}
                 <div className="w-full flex justify-center items-center px-0 sm:px-4 lg:px-6 xl:px-8">
@@ -147,7 +151,7 @@ const Header = ({openPopup}) => {
                                   <div className="flex space-x-5 xl:space-x-8 2xl:space-x-10 font-medium text-sm xl:text-base text-slate-700">
                                     <a href="/" className="hover:text-slate-900 transition-colors whitespace-nowrap">Accueil</a>
                                     <a href="/blog" className="hover:text-slate-900 transition-colors whitespace-nowrap">Blog</a>
-                                    <a href="#" className="hover:text-slate-900 transition-colors whitespace-nowrap">Porfolio</a>
+                                    <a href="/portfolio" className="hover:text-slate-900 transition-colors whitespace-nowrap">Porfolio</a>
                                     <a href="/contact" className="hover:text-slate-900 transition-colors whitespace-nowrap">Contact</a>
                                   </div>
                               </nav>
@@ -205,10 +209,16 @@ const Header = ({openPopup}) => {
                         Portfolio
                       </a>
                       <a 
-                        onClick={() => handleOpenPopup('quote')} 
+                        onClick={() => navigate("/submission")} 
                         className="hover:text-slate-900 transition-colors cursor-pointer py-2"
                       >
                         Demander un devis
+                      </a>
+                      <a 
+                        onClick={() => handleNavigation("/followService")}
+                        className="hover:text-slate-900 transition-colors cursor-pointer py-2"
+                      >
+                        Suivre mon service
                       </a>
                       <a 
                         onClick={() => handleNavigation("/contact")}

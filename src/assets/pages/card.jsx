@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as Icons from 'lucide-react';
 import { ArrowLeft, Star, Check, Shield, Clock, Package, MessageCircle, Download, Share2, ChevronDown, ChevronUp, Mail, Phone, Award, Users, TrendingUp, Calendar, FileText, CheckCircle2 } from 'lucide-react';
+import CommentSection from '../components/comment.jsx';
 
 export default function CardPage() {
   const { state } = useLocation();
@@ -59,26 +60,26 @@ export default function CardPage() {
   ];
 
   return (
-    <div className="min-h-screen lg:pt-16 bg-slate-50">
+    <div className="min-h-screen bg-dark lg:pt-14 pt-0 bg-slate-50">
       {/* Header professionnel */}
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-dark ">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <button 
               onClick={() => navigate('/services')}
               className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors font-medium"
             >
-              <ArrowLeft className="w-5 h-5" />
-              <span>Catalogue des services</span>
+              <ArrowLeft className="w-5 h-5 text-sub" />
+              <span className='hidden lg:block text-sub'>Catalogue des services</span>
             </button>
             <div className="flex items-center gap-3">
               <button className="px-4 py-2 text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-2">
-                <Share2 className="w-4 h-4" />
-                Partager
+                <Share2 className="w-4 h-4 text-sub text-sub" />
+                <span className='hidden lg:block text-sub'>Partager</span>
               </button>
               <button className="px-4 py-2 text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-2">
-                <Download className="w-4 h-4" />
-                Télécharger la fiche
+                <Download className="w-4 h-4 text-sub" />
+                <span className='hidden lg:block text-sub'>Télécharger la fiche</span>
               </button>
             </div>
           </div>
@@ -86,8 +87,19 @@ export default function CardPage() {
       </div>
 
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-6 py-12">
+      <div
+        className="
+          relative
+          bg-cover bg-center text-white
+          before:content-['']
+          before:absolute before:inset-0 before:bg-black/40 before:z-1
+        "
+        style={{
+          backgroundImage: `url(${service.cover_url ? service.cover_url : '/img/background/card.webp'})`,
+        }}
+      >
+
+        <div className="max-w-7xl relative z-1 mx-auto px-6 py-12">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <div className="inline-block px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm font-medium mb-4">
@@ -111,10 +123,22 @@ export default function CardPage() {
               <div className="flex gap-4">
                 <button 
                   onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg"
+                  className="
+                    px-8 py-3 
+                    backdrop-blur-md 
+                    bg-purple-500/20
+                    border border-purple-500
+                    hover:bg-purple-600/90
+                    text-white 
+                    rounded-lg 
+                    font-medium 
+                    transition-colors 
+                    shadow-lg
+                  "
                 >
                   Demander un devis
                 </button>
+
                 <button 
                   onClick={() => alert('Contact prestataire !')}
                   className="px-8 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-colors backdrop-blur-sm border border-white/20"
@@ -124,44 +148,24 @@ export default function CardPage() {
               </div>
             </div>
 
-            <div className="flex justify-center">
-              <div className="w-64 h-64 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 flex items-center justify-center shadow-2xl">
-                {Icon && <Icon className="w-32 h-32 text-blue-400" />}
+            <div className="flex  justify-center">
+              <div className="relative z-1 w-64 h-64 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 flex items-center justify-center shadow-2xl">
+                <img src={service.img_url} alt={service.title} className="w-full h-full object-cover rounded-2xl" />
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Stats Bar */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <div className="grid grid-cols-3 gap-8">
-            {stats.map((stat, idx) => {
-              const StatIcon = stat.icon;
-              return (
-                <div key={idx} className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                    <StatIcon className="w-6 h-6 text-slate-600" />
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-slate-900">{stat.value}</div>
-                    <div className="text-sm text-slate-600">{stat.label}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+      
 
-      <div className="max-w-7xl mx-auto px-6 py-12">
+      <div className="max-w-7xl bg-dark mx-auto px-6 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Contenu principal */}
           <div className="lg:col-span-2 space-y-6">
             {/* Navigation Tabs */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-              <div className="border-b border-slate-200">
+            <div className="dark:bg-gray-800 border border-white/10 overflow-hidden rounded-xl shadow-sm shadow">
+              <div className="border-b  border-slate-200">
                 <div className="flex">
                   {[
                     { id: 'overview', label: 'Vue d\'ensemble', icon: FileText },
@@ -173,10 +177,10 @@ export default function CardPage() {
                       <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 px-6 py-4 font-medium transition-all flex items-center justify-center gap-2 border-b-2 ${
+                        className={`flex-1 px-6 py-4 font-medium transition-all flex items-center justify-center gap-2  ${
                           activeTab === tab.id
-                            ? 'border-slate-900 text-slate-900 bg-slate-50'
-                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                            ? 'text-dark bg-slate-100  dark:bg-slate-600'
+                            : ' text-slate-500 hover:text-white hover:bg-slate-700'
                         }`}
                       >
                         <TabIcon className="w-4 h-4" />
@@ -191,13 +195,13 @@ export default function CardPage() {
                 {activeTab === 'overview' && (
                   <div className="space-y-6">
                     <div>
-                      <h3 className="text-xl font-bold text-slate-900 mb-4">Description détaillée</h3>
-                      <p className="text-slate-700 leading-relaxed">{service.description}</p>
+                      <h3 className="text-xl font-bold text-dark mb-4">Description détaillée</h3>
+                      <p className="text-sub leading-relaxed">{service.description}</p>
                     </div>
 
                     {technologies.length > 0 && (
                       <div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-4">Technologies & Outils</h3>
+                        <h3 className="text-xl font-bold text-dark mb-4">Technologies & Outils</h3>
                         <div className="flex flex-wrap gap-2">
                           {technologies.map((tech, idx) => (
                             <span key={idx} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium border border-slate-200">
@@ -208,14 +212,14 @@ export default function CardPage() {
                       </div>
                     )}
 
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
+                    <div className="bg-slate-50 dark:bg-gray-700 border border-slate-200 dark:border-0 rounded-lg p-6">
                       <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <div className="w-12 h-12 bg-blue-600 dark:bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
                           <Calendar className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <div className="font-semibold text-slate-900 mb-1">Délai de réalisation</div>
-                          <div className="text-slate-600">{displayDuration}</div>
+                          <div className="font-semibold text-dark mb-1">Délai de réalisation</div>
+                          <div className="text-sub">{displayDuration}</div>
                         </div>
                       </div>
                     </div>
@@ -224,14 +228,14 @@ export default function CardPage() {
 
                 {activeTab === 'features' && service.features && (
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-4">Caractéristiques principales</h3>
+                    <h3 className="text-xl font-bold text-dark mb-4">Caractéristiques principales</h3>
                     <div className="space-y-3">
                       {service.features.map((feature, idx) => (
-                        <div key={idx} className="flex items-start gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                        <div key={idx} className="flex items-start gap-3 p-4 bg-slate-50 dark:bg-gray-700 rounded-lg border border-slate-200 dark:border-0">
                           <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
                             <Check className="w-4 h-4 text-green-600" />
                           </div>
-                          <span className="text-slate-700 leading-relaxed">{feature}</span>
+                          <span className="text-sub leading-relaxed">{feature}</span>
                         </div>
                       ))}
                     </div>
@@ -240,12 +244,12 @@ export default function CardPage() {
 
                 {activeTab === 'deliverables' && service.deliverables && (
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-4">Ce que vous recevrez</h3>
+                    <h3 className="text-xl font-bold text-dark mb-4">Ce que vous recevrez</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {service.deliverables.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                          <Package className="w-5 h-5 text-blue-600 flex-shrink-0" />
-                          <span className="text-slate-700 font-medium">{item}</span>
+                        <div key={idx} className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-gray-700 rounded-lg border border-slate-200 dark:border-0">
+                          <Package className="w-5 h-5 text-dark flex-shrink-0" />
+                          <span className="text-sub font-medium">{item}</span>
                         </div>
                       ))}
                     </div>
@@ -255,40 +259,43 @@ export default function CardPage() {
             </div>
 
             {/* Garanties professionnelles */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-              <h3 className="text-xl font-bold text-slate-900 mb-6">Nos engagements qualité</h3>
+            <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm border border-slate-200 p-8 dark:border-0">
+              <h3 className="text-xl font-bold text-dark mb-6">Nos engagements qualité</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Shield className="w-8 h-8 text-green-600" />
                   </div>
-                  <div className="font-semibold text-slate-900 mb-1">Garantie Qualité</div>
-                  <div className="text-sm text-slate-600">Satisfaction garantie ou remboursé</div>
+                  <div className="font-semibold text-dark mb-1">Garantie Qualité</div>
+                  <div className="text-sm text-sub">Satisfaction garantie </div>
                 </div>
                 <div className="text-center">
                   <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Clock className="w-8 h-8 text-blue-600" />
                   </div>
-                  <div className="font-semibold text-slate-900 mb-1">Respect des délais</div>
-                  <div className="text-sm text-slate-600">Livraison dans les temps convenus</div>
+                  <div className="font-semibold text-dark mb-1">Respect des délais</div>
+                  <div className="text-sm text-sub">Livraison dans les temps convenus</div>
                 </div>
                 <div className="text-center">
                   <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Award className="w-8 h-8 text-purple-600" />
                   </div>
-                  <div className="font-semibold text-slate-900 mb-1">Expertise certifiée</div>
-                  <div className="text-sm text-slate-600">Équipe qualifiée et expérimentée</div>
+                  <div className="font-semibold text-dark mb-1">Expertise certifiée</div>
+                  <div className="text-sm text-sub">Équipe qualifiée et expérimentée</div>
                 </div>
               </div>
             </div>
+
+            <CommentSection initialComments={service.comments} />
+
           </div>
 
           {/* Sidebar Prix & Contact */}
           <div className="lg:col-span-1">
             <div className="sticky top-6 space-y-6">
               {/* Card Prix */}
-              <div id="pricing" className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="bg-slate-900 text-white p-6">
+              <div id="pricing" className="bg-dark rounded-xl shadow-sm border dark:border-white/10 border-slate-200 overflow-hidden">
+                <div className="bg-slate-900 dark:bg-gray-900 text-white p-6">
                   <h3 className="text-lg font-bold mb-1">Formules disponibles</h3>
                   <p className="text-slate-300 text-sm">Choisissez l'offre adaptée à vos besoins</p>
                 </div>
@@ -303,8 +310,8 @@ export default function CardPage() {
                           onClick={() => setSelectedOption(option.id)}
                           className={`relative p-4 rounded-lg cursor-pointer transition-all border-2 ${
                             selectedOption === option.id
-                              ? 'border-slate-900 bg-slate-50'
-                              : 'border-slate-200 hover:border-slate-300'
+                              ? 'dark:border-slate-900 border-blue-900 text-blue-900 dark:bg-slate-300 bg-blue-50'
+                              : 'border-white/10 hover:border-white/20 dark:text-slate-100'
                           }`}
                         >
                           {option.popular && (
@@ -313,13 +320,13 @@ export default function CardPage() {
                             </div>
                           )}
                           <div className="flex justify-between items-start mb-2">
-                            <div className="font-bold text-slate-900">{option.name}</div>
+                            <div className="font-bold ">{option.name}</div>
                             <div className="text-right">
-                              <div className="font-bold text-lg text-slate-900">{option.price.toLocaleString('fr-FR')} €</div>
+                              <div className="font-bold text-lg ">{option.price.toLocaleString('fr-FR')} €</div>
                             </div>
                           </div>
-                          <div className="text-sm text-slate-600 mb-2">{option.desc}</div>
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <div className="text-sm mb-2">{option.desc}</div>
+                          <div className="flex items-center gap-2 text-xs">
                             <Clock className="w-3 h-3" />
                             {option.duration}
                           </div>
@@ -358,14 +365,27 @@ export default function CardPage() {
                   {/* CTA */}
                   <button 
                     onClick={() => alert('Demande de devis envoyée !')}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-4 rounded-lg transition-all shadow-lg mb-3"
+                    className="
+                    px-8 py-3 
+                    w-full
+                    mb-3
+                    backdrop-blur-md 
+                    bg-purple-900/60
+                    border border-purple-500
+                    hover:bg-purple-600/90
+                    text-white 
+                    rounded-lg 
+                    font-medium 
+                    transition-colors 
+                    shadow-lg
+                  "
                   >
                     Demander un devis gratuit
                   </button>
                   
                   <button 
                     onClick={() => alert('Calendrier ouvert !')}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg transition-all"
+                    className="px-8 w-full py-3 bg-dark hover:bg-white/20 text-dark rounded-lg font-medium transition-colors backdrop-blur-sm border border-white/20"
                   >
                     Planifier un rendez-vous
                   </button>

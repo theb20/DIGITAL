@@ -20,6 +20,8 @@ import {
   Download,
   Sun,
   MapPin,
+  Cpu,
+  Rocket,
   ChevronDown,
   ChevronRight,
   ExternalLink,
@@ -159,7 +161,8 @@ export default function PrivacyPolicyPage() {
     { id: 10, icon: FileText, title: "CGV", badge: "Vente", color: "gray" },
     { id: 11, icon: FileText, title: "CGU", badge: "Utilisation", color: "gray" },
     { id: 12, icon: FileText, title: "Politique de confidentialité", badge: "Vie privée", color: "gray" },
-    { id: 13, icon: HelpCircle, title: "FAQ", badge: "Questions", color: "amber" }
+    { id: 13, icon: HelpCircle, title: "FAQ", badge: "Questions", color: "amber" },
+    { id: 14, icon: HelpCircle, title: "Garanties", badge: "Assurance", color: "amber" },
   ];
 
 
@@ -1213,7 +1216,49 @@ onToggle={() => toggleSection(13)}
 })()}
 </PolicySection>
 
-            
+ {/* Section 14 - Garantie */}
+       <PolicySection
+          id={14}
+          icon={<Shield className="w-5 h-5" />}
+          title="14. Garantie & Avantages Exclusifs"
+          badge="Garantie"
+          badgeColor="green"
+          expanded={expandedSection === 14}
+          onToggle={() => toggleSection(14)}
+        >
+          {(() => {
+            const features = [
+              { icon: Cpu, title: 'Technologie Avancée', description: "Tous nos services utilisent des technologies de pointe pour assurer des résultats fiables et rapides." },
+              { icon: Globe, title: 'Couverture Globale', description: 'Nos solutions sont adaptées pour vos besoins locaux et internationaux avec la même qualité.' },
+              { icon: Rocket, title: 'Lancement Rapide', description: "Nos équipes mettent en place votre projet en un temps record, sans compromis sur la qualité." },
+              { icon: Award, title: 'Satisfaction Garantie', description: "Nous nous engageons sur un haut niveau de satisfaction et offrons des corrections immédiates si nécessaire." },
+              { icon: Users, title: 'Support Premium', description: "Un service client dédié avec assistance personnalisée pour chaque client." },
+              { icon: Sparkles, title: 'Innovation Permanente', description: 'Améliorations continues et adoption des meilleures pratiques pour rester au top.' },
+              { icon: Target, title: 'Résultats Mesurables', description: "Des indicateurs précis pour suivre l’efficacité et l’impact de nos services." },
+              { icon: Shield, title: 'Protection Complète', description: "Toutes vos données et votre projet sont sécurisés avec des protocoles stricts." },
+            ];
+
+            return (
+              <div className="space-y-6">
+                <p className="text-gray-700 dark:text-gray-300 text-sm mb-4">
+                  Nos services sont garantis avec un engagement sur la performance, la sécurité et l’innovation. Vous bénéficiez d’avantages exclusifs pour assurer la réussite et la tranquillité d’esprit sur vos projets.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {features.map((feature, index) => (
+                    <div key={index} className="border p-4 rounded-lg hover:shadow-lg transition-shadow">
+                      <div className="text-green-500 mb-2">
+                        <feature.icon className="w-6 h-6" />
+                      </div>
+                      <h5 className="font-semibold text-dark mb-1">{feature.title}</h5>
+                      <p className="text-dark text-sm">{feature.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </PolicySection>
+      
           </div>
 
           {/* Call to Action */}

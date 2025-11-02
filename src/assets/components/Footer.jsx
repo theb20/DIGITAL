@@ -11,10 +11,11 @@ const Footer = () => {
     const isQuotePage = location.pathname === "/quote";
     const isPrivacyPage = location.pathname === "/privacy";
     const isCardPage = location.pathname === "/card";
+    const isProfilPage = location.pathname === "/profil";
     
   return (
     <>
-    {!isSignPage && !isResetPage && !isQuotePage && !isPrivacyPage && (
+    {!isSignPage && !isProfilPage && !isResetPage && !isQuotePage && !isPrivacyPage && (
       <footer className=" text-gray-300 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
@@ -48,8 +49,8 @@ const Footer = () => {
               <h4 className="font-semibold text-dark mb-4">Support</h4>
               <ul className="space-y-2 text-sm">
                 <li><a href="#" className="hover:text-amber-600 transition-colors">Centre d'aide</a></li>
-                <li><a href="#" className="hover:text-amber-600 transition-colors">Contact</a></li>
-                <li><a href="#" className="hover:text-amber-600 transition-colors">FAQ</a></li>
+                <li><a href="/contact" className="hover:text-amber-600 transition-colors">Contact</a></li>
+                <li><a href="/privacy#section-13" className="hover:text-amber-600 transition-colors">FAQ</a></li>
                 <li><a href="#" className="hover:text-amber-600 transition-colors">Garanties</a></li>
               </ul>
             </div>
@@ -98,7 +99,7 @@ const Footer = () => {
       </a>
       <span className="text-gray-600">•</span>
       <a
-        href=""
+        href="/profil"
         className="hover:text-black dark:hover:text-white transition-colors duration-200"
       >
         Paramètres

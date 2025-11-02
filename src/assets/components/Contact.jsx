@@ -47,7 +47,9 @@ export default function ContactBanner() {
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </button>
               
-              <button className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-gray-700 font-semibold rounded-xl border-2 border-gray-200 hover:border-black/40 hover:text-black/80 transition-all duration-300">
+              <button 
+              onClick={() => navigate('/privacy')}
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-gray-700 font-semibold rounded-xl border-2 border-gray-200 hover:border-black/40 hover:text-black/80 transition-all duration-300">
                 En savoir plus
               </button>
             </div>

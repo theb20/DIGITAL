@@ -172,8 +172,6 @@ export default function FilterFinderHome() {
               </div>
             </div>
           </div>
-
-
           {/* Titre principal avec animation */}
           <div className="max-w-4xl mx-auto text-center mb-16">
               <h1 className="text-3xl h-[130px] lg:h-[220px] sm:text-5xl lg:text-6xl font-light text-gray-100 mb-6 leading-tight tracking-tight">
@@ -211,19 +209,18 @@ export default function FilterFinderHome() {
               </div>
             </div>
           </div>
+          {/* Module de recherche B2B */}
+          <div className="max-w-4xl mx-auto relative">
+            {/* Cercle ping derrière le composant */}
+            <div className="absolute inset-0 flex justify-center items-center">
+              <span className="lg:w-100 lg:h-17 bg-white rounded-full opacity-30 lg:animate-ping"></span>
+            </div>
 
-{/* Module de recherche B2B */}
-<div className="max-w-4xl mx-auto relative">
-  {/* Cercle ping derrière le composant */}
-  <div className="absolute inset-0 flex justify-center items-center">
-    <span className="lg:w-100 lg:h-17 bg-white rounded-full opacity-30 lg:animate-ping"></span>
-  </div>
-
-  {/* Composant de recherche au-dessus */}
-  <div className="relative z-10">
-    <SearchComponent />
-  </div>
-</div>
+            {/* Composant de recherche au-dessus */}
+            <div className="relative z-10">
+              <SearchComponent />
+            </div>
+          </div>
 
 
       </div>
@@ -231,7 +228,7 @@ export default function FilterFinderHome() {
       </section>
 
       {/* About Digital Company */}
-      <section className="">
+      <section id="about" className="">
        <AboutDigital/>
       </section>
 
@@ -282,7 +279,9 @@ export default function FilterFinderHome() {
                className="px-8 py-4 bg-black text-white font-semibold rounded-xl hover:shadow-2xl hover:scale-105 transition-all duration-300">
                 Consulter l’ensemble de la FAQ
               </button>
-              <button className="px-8 py-4 bg-white text-gray-900 font-semibold rounded-xl border-2 border-gray-200 hover:border-black-600 hover:shadow-xl transition-all duration-300">
+              <button 
+              onClick={() => navigate('/portfolio')}
+              className="px-8 py-4 bg-white text-gray-900 font-semibold rounded-xl border-2 border-gray-200 hover:border-black-600 hover:shadow-xl transition-all duration-300">
                 Voir nos réalisations
               </button>
             </div>

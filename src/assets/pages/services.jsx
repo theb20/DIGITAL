@@ -85,7 +85,7 @@ const handleServiceClick = (service) => {
   const regularServices = filteredServices.filter(s => !s.featured);
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-dark">
 
       {/* Hero Section */}
      <div className="relative lg:pt-30 bg-[url('/img/background/service.jpg')] bg-cover bg-center border-b border-gray-200 dark:border-gray-600 
