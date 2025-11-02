@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #ffffff;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* ✅ Active le dark mode basé sur la classe */
+@custom-variant dark (&:where(.dark, .dark *));
+
+.section {
+  @apply w-full max-w-4xl h-full mx-auto px-4 lg:mt-50 ;
+}
+.bg-dark{
+  @apply dark:bg-gray-800 bg-white;
+}
+.text-dark{
+  @apply dark:text-white text-slate-900;
+}
+.text-sub{
+  @apply dark:text-white/60 text-slate-600;
+}
+
+input::placeholder {
+  @apply text-gray-400;
+}
+
+.auth-container {
+  position: relative;
+  min-height: 100vh;
+  background-image: url('../../../public/img/background/wall_sign.png');
+  background-size: cover;
+  background-position: center;
+}
+
+.auth-container::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.571); /* Overlay sombre */
+  z-index: 0;
+}
+
+/* Côté illustration */
+.bg-side {
+  background-image: url('../../../public/img/background/bg_sign.png');
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.bg-side::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgb(40, 40, 40) 0%, transparent); /* Overlay sur l'illustration */
+  z-index: 0;
+}
+@keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.4s ease-out;
+        }
+@keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+        .bg-grid-white\/10 {
+          background-image: 
+            linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+          background-size: 40px 40px;
+        }
+
+      /* Version avec gradient (encore mieux !) */
+    
+      
