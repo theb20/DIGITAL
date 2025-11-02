@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { Search, Building2, ChevronRight, Check, ArrowRight, Users, Target, Lightbulb, BarChart, Shield, Cog, FileText, Send, CheckCircle, MessageSquare, Calendar } from 'lucide-react';
+import { Search, Building2, ChevronRight, Check, ArrowRight, Briefcase, Target, Lightbulb, BarChart, Shield, Cog, FileText, Send, CheckCircle, MessageSquare, Calendar, Code, Palette, Zap, CheckSquare, Printer, Camera, Mail, X  } from 'lucide-react';
+  import {useNavigate} from 'react-router-dom';
+  import { services } from '../constant/servicesData.js';
 
 export default function ServicesPage() {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState('Tous');
   const [searchQuery, setSearchQuery] = useState('');
   const [showProposalForm, setShowProposalForm] = useState(false);
@@ -16,149 +19,21 @@ export default function ServicesPage() {
     timeline: ''
   });
   const [formSubmitted, setFormSubmitted] = useState(false);
-
   const categories = [
-    { name: 'Tous', icon: FileText },
-    { name: 'Stratégie', icon: Target },
-    { name: 'Transformation', icon: Cog },
-    { name: 'Innovation', icon: Lightbulb },
-    { name: 'Performance', icon: BarChart }
-  ];
+  { name: 'Tous', icon: FileText },
+  { name: 'Pack PME', icon: Building2 },
+  { name: 'Développement Web', icon: Code },
+  { name: 'Design Graphique', icon: Palette },
+  { name: 'Identité Visuelle', icon: Zap },
+  { name: 'Gestion de Projet', icon: CheckSquare },
+  { name: 'Conception de Documents', icon: FileText },
+  { name: 'Print & Impression', icon: Printer },
+  { name: 'Photographie & Vidéo', icon: Camera },
+  { name: 'SEO & Référencement', icon: Search },
+  { name: 'Email Marketing', icon: Mail },
+  
+];
 
-  const services = [
-    {
-      id: 1,
-      title: "Stratégie digitale",
-      category: "Stratégie",
-      icon: Target,
-      description: "Définition et déploiement de votre stratégie de transformation digitale alignée avec vos objectifs business.",
-      features: [
-        "Audit digital complet de votre organisation",
-        "Définition de la vision et des objectifs stratégiques",
-        "Roadmap de transformation sur 3-5 ans",
-        "Accompagnement des équipes dirigeantes"
-      ],
-      deliverables: [
-        "Document de stratégie digitale",
-        "Roadmap détaillée avec jalons",
-        "Analyse de maturité digitale",
-        "Plan d'investissement prévisionnel"
-      ],
-      duration: "8-12 semaines",
-      price: "Sur devis",
-      featured: true
-    },
-    {
-      id: 2,
-      title: "Transformation organisationnelle",
-      category: "Transformation",
-      icon: Users,
-      description: "Accompagnement global de votre organisation dans sa mutation vers de nouveaux modèles opérationnels.",
-      features: [
-        "Diagnostic organisationnel approfondi",
-        "Redéfinition des processus métier",
-        "Conduite du changement et formation",
-        "Mise en place de nouvelles gouvernances"
-      ],
-      deliverables: [
-        "Nouveau schéma organisationnel",
-        "Cartographie des processus optimisés",
-        "Plan de conduite du changement",
-        "Programme de formation des équipes"
-      ],
-      duration: "12-24 semaines",
-      price: "Sur devis",
-      featured: true
-    },
-    {
-      id: 3,
-      title: "Architecture d'entreprise",
-      category: "Stratégie",
-      icon: Cog,
-      description: "Conception et optimisation de votre architecture SI pour une agilité et une scalabilité maximales.",
-      features: [
-        "Audit de l'architecture existante",
-        "Définition de l'architecture cible",
-        "Plan de migration et de modernisation",
-        "Gouvernance de l'architecture"
-      ],
-      deliverables: [
-        "Documentation d'architecture (TOGAF)",
-        "Schémas d'architecture technique",
-        "Plan de transformation SI",
-        "Référentiel d'architecture"
-      ],
-      duration: "10-16 semaines",
-      price: "Sur devis",
-      featured: true
-    },
-    {
-      id: 4,
-      title: "Innovation & R&D",
-      category: "Innovation",
-      icon: Lightbulb,
-      description: "Structuration de votre démarche innovation et identification d'opportunités technologiques.",
-      features: [
-        "Ateliers d'idéation et innovation",
-        "Veille technologique stratégique",
-        "POC et prototypage rapide",
-        "Pilotage de programmes innovation"
-      ],
-      deliverables: [
-        "Portefeuille de projets innovants",
-        "Prototypes et POC fonctionnels",
-        "Cadre méthodologique innovation",
-        "Roadmap technologique"
-      ],
-      duration: "6-12 semaines",
-      price: "Sur devis",
-      featured: false
-    },
-    {
-      id: 5,
-      title: "Optimisation des performances",
-      category: "Performance",
-      icon: BarChart,
-      description: "Analyse et amélioration continue de vos performances opérationnelles et financières.",
-      features: [
-        "Audit de performance opérationnelle",
-        "Identification des leviers d'optimisation",
-        "Mise en place de KPIs et tableaux de bord",
-        "Suivi et pilotage de la performance"
-      ],
-      deliverables: [
-        "Rapport d'audit détaillé",
-        "Plan d'optimisation priorisé",
-        "Tableaux de bord décisionnels",
-        "Programme d'amélioration continue"
-      ],
-      duration: "8-14 semaines",
-      price: "Sur devis",
-      featured: false
-    },
-    {
-      id: 6,
-      title: "Cybersécurité & Conformité",
-      category: "Transformation",
-      icon: Shield,
-      description: "Sécurisation de votre infrastructure et mise en conformité réglementaire (RGPD, ISO 27001).",
-      features: [
-        "Audit de sécurité et tests d'intrusion",
-        "Mise en conformité réglementaire",
-        "Définition de la politique de sécurité",
-        "Formation et sensibilisation des équipes"
-      ],
-      deliverables: [
-        "Rapport d'audit de sécurité",
-        "Politique de sécurité documentée",
-        "Plan de remédiation",
-        "Documentation de conformité"
-      ],
-      duration: "10-16 semaines",
-      price: "Sur devis",
-      featured: false
-    }
-  ];
 
   const handleInputChange = (e) => {
     setFormData({
@@ -186,6 +61,19 @@ export default function ServicesPage() {
     }, 3000);
   };
 
+
+const handleServiceClick = (service) => {
+  // On exclut l'icône
+  const { icon, ...serviceWithoutIcon } = service;
+
+  navigate('/card', { 
+    state: { 
+      service: serviceWithoutIcon, 
+      iconName: service.icon.name  
+    } 
+  });
+};
+
   const filteredServices = services.filter(service => {
     const matchesCategory = selectedCategory === 'Tous' || service.category === selectedCategory;
     const matchesSearch = service.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -200,11 +88,11 @@ export default function ServicesPage() {
     <div className="min-h-screen bg-white">
 
       {/* Hero Section */}
-     <div className="relative lg:pt-30 bg-[url('/img/background/service.jpg')] bg-cover bg-center border-b border-gray-200 
+     <div className="relative lg:pt-30 bg-[url('/img/background/service.jpg')] bg-cover bg-center border-b border-gray-200 dark:border-gray-600 
     before:content-[''] before:absolute before:inset-0 before:bg-black/50 before:z-1 z-10">
 
-        <div className="max-w-7xl z-10 relative mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <div className=" max-w-3xl">
+        <div className="max-w-7xl z-10  relative mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="mb-10 max-w-3xl">
             <div className="inline-flex items-center bg-dark gap-2 px-4 py-1.5 text-dark text-xs font-semibold rounded-full mb-6">
               <Cog className="w-3.5 h-3.5" />
               NOS EXPERTISES
@@ -223,17 +111,27 @@ export default function ServicesPage() {
                 Soumettre un projet
                 <ArrowRight className="w-4 h-4" />
               </button>
-              <button className="px-6 py-3 border-2 border-gray-300 text-white font-semibold rounded hover:border-blue-900 hover:text-blue-900 transition-colors inline-flex items-center gap-2">
+              <button className="px-6 py-3 border-2 border-gray-300 text-white font-semibold rounded hover:border-white/30 hover:text-black hover:bg-white transition-colors inline-flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 Prendre rendez-vous
               </button>
             </div>
           </div>
+           <div className="relative block lg:hidden">
+              <Search className="absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher un service..."
+                className="pl-10 pr-4 py-4 bg-dark text-dark border border-gray-300 dark:border-gray-600 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent w-full"
+              />
+            </div>
         </div>
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-dark border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+      <div className="bg-dark border-b border-gray-200 dark:border-gray-600 top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2 overflow-x-auto">
@@ -287,7 +185,7 @@ export default function ServicesPage() {
                 return (
                   <article
                     key={service.id}
-                    className="group dark:bg-black/40 border-2 border-slate-100 dark:border-slate-700 rounded-lg p-8 hover:shadow-xl transition-all duration-300"
+                    className="group dark:bg-black/40 border-2 border-slate-100 dark:border-slate-800 rounded-lg p-8 hover:shadow-xl transition-all duration-300"
                   >
                     <div className="flex items-start justify-between mb-6">
                       <div className="w-14 h-14 bg-dark rounded-lg flex items-center justify-center">
@@ -329,7 +227,10 @@ export default function ServicesPage() {
                       </div>
                     </div>
 
-                    <button className="w-full px-6 py-3 bg-dark text-dark dark:border dark:border-white/30 border border-black/30 font-semibold rounded hover:bg-black transition-colors inline-flex items-center justify-center gap-2">
+                    <button 
+                      onClick={() => handleServiceClick(service)}                      
+                      className="w-full px-6 py-3 bg-dark text-dark dark:border dark:border-white/30 border border-black/30 font-semibold rounded hover:bg-black transition-colors inline-flex items-center justify-center gap-2"
+                    >
                       En savoir plus
                       <ChevronRight className="w-4 h-4" />
                     </button>
@@ -345,8 +246,8 @@ export default function ServicesPage() {
           <div className="mb-16">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Autres services</h2>
-                <p className="text-gray-600 mt-1">Solutions complémentaires pour votre entreprise</p>
+                <h2 className="text-2xl font-bold text-dark">Autres services</h2>
+                <p className="text-sub mt-1">Solutions complémentaires pour votre entreprise</p>
               </div>
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -355,22 +256,22 @@ export default function ServicesPage() {
                 return (
                   <article
                     key={service.id}
-                    className="group bg-white border border-gray-200 rounded-lg p-6 hover:border-blue-900 hover:shadow-lg transition-all duration-300"
+                    className="group dark:bg-black/40 border border-gray-200 dark:border-slate-800 rounded-lg p-6 hover:border-black/40 hover:shadow-lg transition-all duration-300"
                   >
                     <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-blue-900 transition-colors">
+                      <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-black/90 transition-colors">
                         <Icon className="w-6 h-6 text-gray-700 group-hover:text-white transition-colors" />
                       </div>
-                      <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded">
+                      <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 dark:text-white text-gray-700 text-xs font-semibold rounded">
                         {service.category}
                       </span>
                     </div>
 
-                    <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-blue-900 transition-colors">
+                    <h3 className="text-xl font-bold text-dark mb-3 group-hover:text-blue-900 transition-colors">
                       {service.title}
                     </h3>
 
-                    <p className="text-sm text-gray-700 mb-4 leading-relaxed line-clamp-3">
+                    <p className="text-sm text-sub leading-relaxed line-clamp-3">
                       {service.description}
                     </p>
 
@@ -378,8 +279,8 @@ export default function ServicesPage() {
                       <ul className="space-y-1.5">
                         {service.features.slice(0, 3).map((feature, idx) => (
                           <li key={idx} className="flex items-start gap-2 text-xs text-gray-600">
-                            <Check className="w-3 h-3 text-blue-900 mt-0.5 flex-shrink-0" />
-                            <span>{feature}</span>
+                            <Check className="w-3 h-3 text-dark mt-0.5 flex-shrink-0" />
+                            <span className="text-sub">{feature}</span>
                           </li>
                         ))}
                       </ul>
@@ -387,9 +288,12 @@ export default function ServicesPage() {
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                       <div className="text-xs text-gray-600">
-                        <span className="font-semibold text-gray-900">{service.duration}</span>
+                        <span className="font-semibold text-sub ">{service.duration}</span>
                       </div>
-                      <button className="text-blue-900 font-semibold text-sm hover:gap-2 inline-flex items-center gap-1 transition-all">
+                      <button 
+                        onClick={() => handleServiceClick(service)}
+                        className="text-sub font-semibold text-sm hover:gap-2 inline-flex items-center gap-1 transition-all"
+                      >
                         Découvrir
                         <ChevronRight className="w-4 h-4" />
                       </button>
@@ -403,35 +307,35 @@ export default function ServicesPage() {
 
         {/* Service Ideas Section */}
         <div className="mb-16">
-          <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg border border-gray-200 p-8 md:p-12">
+          <div className="bg-white rounded-lg border border-gray-200 dark:border-slate-800 p-8 md:p-12 dark:bg-black/40">
             <div className="max-w-4xl mx-auto text-center">
-              <Lightbulb className="w-12 h-12 text-blue-900 mx-auto mb-6" />
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              <Lightbulb className="w-12 h-12 text-black dark:text-white mx-auto mb-6" />
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
                 Vous avez un besoin spécifique ?
               </h2>
-              <p className="text-lg text-gray-700 mb-8">
+              <p className="text-lg text-sub  mb-8">
                 Chaque entreprise est unique. Nous construisons des solutions sur-mesure adaptées à vos enjeux particuliers. Partagez-nous votre projet et nos experts vous proposeront une approche personnalisée.
               </p>
               <div className="grid md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-white rounded-lg p-6 border border-gray-200">
-                  <MessageSquare className="w-8 h-8 text-blue-900 mb-3" />
-                  <h3 className="font-bold text-gray-900 mb-2">Échange initial</h3>
-                  <p className="text-sm text-gray-600">Discussion pour comprendre vos besoins</p>
+                <div className="bg-white dark:bg-black/10 rounded-lg p-6 border border-gray-200 dark:border-slate-800 flex flex-col items-center justify-center">
+                  <MessageSquare className="w-8 h-8 text-black dark:text-white mb-3" />
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-2">Échange initial</h3>
+                  <p className="text-sm text-gray-600 dark:text-sub">Discussion pour comprendre vos besoins</p>
                 </div>
-                <div className="bg-white rounded-lg p-6 border border-gray-200">
-                  <FileText className="w-8 h-8 text-blue-900 mb-3" />
-                  <h3 className="font-bold text-gray-900 mb-2">Proposition détaillée</h3>
-                  <p className="text-sm text-gray-600">Solution sur-mesure sous 48h</p>
+                <div className="bg-white dark:bg-black/10 rounded-lg p-6 border border-gray-200 dark:border-slate-800 flex flex-col items-center justify-center">
+                  <FileText className="w-8 h-8 text-black dark:text-white mb-3" />
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-2">Proposition détaillée</h3>
+                  <p className="text-sm text-gray-600 dark:text-sub">Solution sur-mesure sous 48h</p>
                 </div>
-                <div className="bg-white rounded-lg p-6 border border-gray-200">
-                  <CheckCircle className="w-8 h-8 text-blue-900 mb-3" />
-                  <h3 className="font-bold text-gray-900 mb-2">Démarrage projet</h3>
-                  <p className="text-sm text-gray-600">Mise en œuvre rapide et efficace</p>
+                <div className="bg-white dark:bg-black/10 rounded-lg p-6 border border-gray-200 dark:border-slate-800 flex flex-col items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-black dark:text-white mb-3" />
+                  <h3 className="font-bold text-gray-900 dark:text-white mb-2">Démarrage projet</h3>
+                  <p className="text-sm text-gray-600 dark:text-sub">Mise en œuvre rapide et efficace</p>
                 </div>
               </div>
               <button 
                 onClick={() => setShowProposalForm(true)}
-                className="px-8 py-4 bg-blue-900 text-white font-semibold rounded hover:bg-blue-800 transition-colors inline-flex items-center gap-2 text-lg"
+                className="px-8 py-4 border border-dark dark:border-none bg-dark dark:bg-slate-800 text-dark font-semibold rounded hover:bg-blue-800 transition-colors inline-flex items-center gap-2 text-lg"
               >
                 Soumettre ma demande
                 <Send className="w-5 h-5" />
@@ -640,85 +544,30 @@ export default function ServicesPage() {
         </div>
       )}
 
-      {/* Why Choose Us Section */}
-      <div className="bg-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold mb-4">Pourquoi nous choisir ?</h2>
-            <p className="text-gray-300 max-w-2xl mx-auto">
-              Une expertise reconnue au service de votre transformation
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-8">
-            <div className="text-center">
-              <div className="text-5xl font-bold text-blue-400 mb-2">15+</div>
-              <div className="text-sm text-gray-300">Années d'expérience</div>
-            </div>
-            <div className="text-center">
-              <div className="text-5xl font-bold text-blue-400 mb-2">200+</div>
-              <div className="text-sm text-gray-300">Projets réalisés</div>
-            </div>
-            <div className="text-center">
-              <div className="text-5xl font-bold text-blue-400 mb-2">95%</div>
-              <div className="text-sm text-gray-300">Clients satisfaits</div>
-            </div>
-            <div className="text-center">
-              <div className="text-5xl font-bold text-blue-400 mb-2">50+</div>
-              <div className="text-sm text-gray-300">Experts consultants</div>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 mt-16">
-            <div className="bg-white/5 backdrop-blur-sm rounded-lg p-6 border border-white/10">
-              <Target className="w-10 h-10 text-blue-400 mb-4" />
-              <h3 className="text-lg font-bold mb-2">Approche sur-mesure</h3>
-              <p className="text-sm text-gray-300">
-                Chaque mission est unique. Nous adaptons nos méthodologies à votre contexte spécifique.
-              </p>
-            </div>
-            <div className="bg-white/5 backdrop-blur-sm rounded-lg p-6 border border-white/10">
-              <Users className="w-10 h-10 text-blue-400 mb-4" />
-              <h3 className="text-lg font-bold mb-2">Équipe d'experts</h3>
-              <p className="text-sm text-gray-300">
-                Des consultants seniors avec une expertise métier et technique reconnue.
-              </p>
-            </div>
-            <div className="bg-white/5 backdrop-blur-sm rounded-lg p-6 border border-white/10">
-              <CheckCircle className="w-10 h-10 text-blue-400 mb-4" />
-              <h3 className="text-lg font-bold mb-2">Résultats mesurables</h3>
-              <p className="text-sm text-gray-300">
-                Nous nous engageons sur des livrables concrets et des KPIs de succès clairs.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* CTA Section */}
-      <div className="bg-gradient-to-br from-slate-50 to-blue-50">
+      <div className="bg-dark dark:bg-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl font-bold text-dark mb-4">
               Prêt à démarrer votre projet ?
             </h2>
-            <p className="text-lg text-gray-700 mb-8">
+            <p className="text-lg text-sub mb-8">
               Échangeons sur vos enjeux et construisons ensemble la solution adaptée à vos besoins.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button 
                 onClick={() => setShowProposalForm(true)}
-                className="px-8 py-4 bg-blue-900 text-white font-semibold rounded hover:bg-blue-800 transition-colors inline-flex items-center justify-center gap-2"
+                className="px-8 py-4 bg-black/80 dark:bg-slate-700 text-white font-semibold rounded hover:bg-blue-800 transition-colors inline-flex items-center justify-center gap-2"
               >
                 Démarrer un projet
                 <ArrowRight className="w-5 h-5" />
               </button>
-              <button className="px-8 py-4 border-2 border-gray-300 text-gray-900 font-semibold rounded hover:border-blue-900 hover:text-blue-900 transition-colors inline-flex items-center justify-center gap-2">
+              <button className="px-8 py-4 border-2 border-gray-300 text-dark font-semibold rounded hover:border-blue-900 hover:text-blue-900 transition-colors inline-flex items-center justify-center gap-2">
                 <Calendar className="w-5 h-5" />
                 Planifier un appel
               </button>
             </div>
-            <p className="text-sm text-gray-600 mt-6">
+            <p className="text-sm text-sub mt-6">
               Réponse sous 24h • Sans engagement • Devis gratuit
             </p>
           </div>

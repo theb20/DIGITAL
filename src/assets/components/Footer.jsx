@@ -10,6 +10,7 @@ const Footer = () => {
     const isResetPage = location.pathname === "/reset";
     const isQuotePage = location.pathname === "/quote";
     const isPrivacyPage = location.pathname === "/privacy";
+    const isCardPage = location.pathname === "/card";
     
   return (
     <>

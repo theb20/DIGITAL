@@ -29,6 +29,7 @@ const Header = ({openPopup}) => {
     const isResetPage = location.pathname === "/reset";
     const isPrivacyPage = location.pathname === "/privacy";
     const isBlogPage = location.pathname === "/blog";
+    const isCardPage = location.pathname === "/card";
     const isHomePage = location.pathname === "/";
 
     // Fonction pour fermer tous les menus
@@ -104,7 +105,7 @@ const Header = ({openPopup}) => {
                 </div>
             </div>
 
-            {!isBlogPage && !isPrivacyPage && (
+            {!isBlogPage && !isCardPage && !isPrivacyPage && (
               <>
                 {/* ===== Barre principale ===== */}
                 <div className="w-full flex justify-center items-center px-0 sm:px-4 lg:px-6 xl:px-8">

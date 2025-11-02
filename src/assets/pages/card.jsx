@@ -1,408 +1,417 @@
 import React, { useState } from 'react';
-import { Heart, Share2, MapPin, Bed, Bath, Maximize, Car, TrendingUp, Phone, Mail, MessageSquare, ChevronLeft, ChevronRight, Home, Zap, Droplet, Wifi, Shield, Calendar, Eye, X, Menu } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import * as Icons from 'lucide-react';
+import { ArrowLeft, Star, Check, Shield, Clock, Package, MessageCircle, Download, Share2, ChevronDown, ChevronUp, Mail, Phone, Award, Users, TrendingUp, Calendar, FileText, CheckCircle2 } from 'lucide-react';
 
-export default function PropertyCard() {
-  const [currentImage, setCurrentImage] = useState(0);
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [showContact, setShowContact] = useState(false);
-  const [showFullGallery, setShowFullGallery] = useState(false);
-  const [activeTab, setActiveTab] = useState('description');
+export default function CardPage() {
+  const { state } = useLocation();
+  const navigate = useNavigate();
+  
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [showAllFeatures, setShowAllFeatures] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
 
-  const property = {
-    title: "Appartement de prestige vue panoramique",
-    type: "Appartement",
-    status: "À vendre",
-    price: 485000,
-    pricePerSqm: 4850,
-    address: "15 Avenue des Champs-Élysées",
-    city: "Paris 8ème",
-    postalCode: "75008",
-    description: "Magnifique appartement de standing situé dans un immeuble haussmannien du 8ème arrondissement. Vue dégagée sur les toits de Paris. Prestations haut de gamme avec parquet massif, moulures d'origine et cheminées en marbre. Proximité immédiate des commerces et transports.",
-    features: {
-      surface: 100,
-      rooms: 4,
-      bedrooms: 3,
-      bathrooms: 2,
-      floor: 5,
-      totalFloors: 6,
-      parking: 1,
-      balcony: 15,
-      yearBuilt: 1880,
-      yearRenovated: 2022
-    },
-    amenities: [
-      { icon: Zap, label: "Chauffage individuel" },
-      { icon: Shield, label: "Digicode" },
-      { icon: Home, label: "Gardien" },
-      { icon: Wifi, label: "Fibre optique" },
-      { icon: Droplet, label: "Climatisation" }
-    ],
-    energyClass: "C",
-    gesClass: "B",
-    images: [
-      "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&h=800&fit=crop",
-      "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&h=800&fit=crop",
-      "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200&h=800&fit=crop",
-      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&h=800&fit=crop",
-      "https://images.unsplash.com/photo-1600607687644-c7171b42498b?w=1200&h=800&fit=crop"
-    ],
-    agent: {
-      name: "Sophie Dubois",
-      title: "Conseillère en immobilier",
-      phone: "+33 1 42 00 00 00",
-      email: "sophie.dubois@agence.fr",
-      photo: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop"
-    },
-    reference: "IMM-2024-7589",
-    publishedDate: "Il y a 3 jours",
-    views: 1247
-  };
+  if (!state || !state.service) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Package className="w-8 h-8 text-slate-400" />
+          </div>
+          <p className="text-slate-600 text-lg mb-6">Aucun service sélectionné.</p>
+          <button
+            onClick={() => navigate('/services')}
+            className="px-8 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
+          >
+            Retour aux services
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  const nextImage = () => {
-    setCurrentImage((prev) => (prev + 1) % property.images.length);
-  };
+  const { service, iconName } = state;
+  const Icon = Icons[iconName];
 
-  const prevImage = () => {
-    setCurrentImage((prev) => (prev - 1 + property.images.length) % property.images.length);
-  };
+  // Initialiser l'option sélectionnée
+  if (service.options && !selectedOption) {
+    const popularOption = service.options.find(o => o.popular);
+    setSelectedOption(popularOption?.id || service.options[0]?.id);
+  }
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 0
-    }).format(price);
-  };
+  const selectedOptionData = service.options 
+    ? service.options.find(opt => opt.id === selectedOption)
+    : null;
 
-  const energyColors = {
-    A: 'bg-green-600',
-    B: 'bg-green-500',
-    C: 'bg-yellow-500',
-    D: 'bg-yellow-600',
-    E: 'bg-orange-500',
-    F: 'bg-orange-600',
-    G: 'bg-red-600'
-  };
+  const displayPrice = selectedOptionData?.price || (typeof service.price === 'string' ? null : service.price);
+  const displayDuration = selectedOptionData?.duration || service.duration;
+
+  const rating = service.rating || 4.8;
+  const reviewCount = service.reviewCount || 150;
+  const provider = service.provider || "Prestataire Pro";
+  const providerRating = service.providerRating || 4.7;
+  const technologies = service.technologies || [];
+
+  const stats = [
+    { icon: Users, label: 'Clients satisfaits', value: '500+' },
+    { icon: Award, label: 'Années d\'expérience', value: '10+' },
+    { icon: TrendingUp, label: 'Taux de réussite', value: '98%' }
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      
-      {/* Galerie plein écran (mobile/tablet friendly) */}
-      <div className="relative h-48 sm:h-64 md:h-80 lg:h-96 bg-gray-900">
-        <img 
-          src={property.images[currentImage]} 
-          alt={property.title}
-          className="w-full h-full object-cover"
-        />
-        
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30"></div>
-
-        {/* Navigation images - Responsive */}
-        <button 
-          onClick={prevImage}
-          className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white p-2 sm:p-3 shadow-lg transition-all rounded-full"
-        >
-          <ChevronLeft className="w-4 h-4 sm:w-6 sm:h-6 text-gray-900" />
-        </button>
-        <button 
-          onClick={nextImage}
-          className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-white/95 hover:bg-white p-2 sm:p-3 shadow-lg transition-all rounded-full"
-        >
-          <ChevronRight className="w-4 h-4 sm:w-6 sm:h-6 text-gray-900" />
-        </button>
-
-        {/* Badges - Empilés sur mobile */}
-        <div className="absolute top-3 sm:top-4 left-3 sm:left-4 flex flex-col sm:flex-row gap-2">
-          <span className="bg-blue-600 text-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded">
-            {property.status}
-          </span>
-          <span className="bg-white text-gray-900 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold rounded">
-            {property.type}
-          </span>
-        </div>
-
-        {/* Actions - Responsive */}
-        <div className="absolute top-3 sm:top-4 right-3 sm:right-4 flex gap-2">
-          <button 
-            onClick={() => setIsFavorite(!isFavorite)}
-            className="bg-white/95 hover:bg-white p-2 sm:p-3 transition-all rounded-full shadow-lg"
-          >
-            <Heart className={`w-4 h-4 sm:w-5 sm:h-5 ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-900'}`} />
-          </button>
-          <button className="bg-white/95 hover:bg-white p-2 sm:p-3 transition-all rounded-full shadow-lg">
-            <Share2 className="w-4 h-4 sm:w-5 sm:h-5 text-gray-900" />
-          </button>
-        </div>
-
-        {/* Compteur - Responsive */}
-        <div className="absolute bottom-3 sm:bottom-4 right-3 sm:right-4 bg-black/80 text-white px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm rounded">
-          {currentImage + 1} / {property.images.length}
-        </div>
-
-        {/* Miniatures - Hidden sur mobile, visible tablet+ */}
-        <div className="hidden md:flex absolute bottom-4 left-4 gap-2">
-          {property.images.slice(0, 5).map((img, idx) => (
-            <button
-              key={idx}
-              onClick={() => setCurrentImage(idx)}
-              className={`w-12 h-12 lg:w-16 lg:h-16 overflow-hidden border-2 transition-all rounded ${
-                currentImage === idx ? 'border-white scale-110' : 'border-transparent opacity-70 hover:opacity-100'
-              }`}
+    <div className="min-h-screen lg:pt-16 bg-slate-50">
+      {/* Header professionnel */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <button 
+              onClick={() => navigate('/services')}
+              className="flex items-center gap-2 text-slate-600 hover:text-slate-900 transition-colors font-medium"
             >
-              <img src={img} alt="" className="w-full h-full object-cover" />
+              <ArrowLeft className="w-5 h-5" />
+              <span>Catalogue des services</span>
             </button>
-          ))}
+            <div className="flex items-center gap-3">
+              <button className="px-4 py-2 text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-2">
+                <Share2 className="w-4 h-4" />
+                Partager
+              </button>
+              <button className="px-4 py-2 text-slate-600 hover:text-slate-900 transition-colors flex items-center gap-2">
+                <Download className="w-4 h-4" />
+                Télécharger la fiche
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Container principal responsive */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
-        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-          
-          {/* Colonne principale */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg sm:rounded-xl shadow-lg overflow-hidden">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+        <div className="max-w-7xl mx-auto px-6 py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-block px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm font-medium mb-4">
+                {service.category}
+              </div>
+              <h1 className="text-4xl font-bold mb-4 leading-tight">{service.title}</h1>
+              <p className="text-slate-300 text-lg mb-6 leading-relaxed">{service.description}</p>
               
-              {/* En-tête - Prix sticky sur mobile */}
-              <div className="sticky top-0 bg-white z-10 border-b border-gray-200 p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-                  <div className="flex-1 min-w-0">
-                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 line-clamp-2">
-                      {property.title}
-                    </h1>
-                    <div className="flex items-center gap-2 text-gray-600 text-sm sm:text-base">
-                      <MapPin className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
-                      <span className="truncate">{property.address}, {property.city}</span>
-                    </div>
+              <div className="flex items-center gap-6 mb-8">
+                <div className="flex items-center gap-2">
+                  <div className="flex">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className={`w-5 h-5 ${i < Math.floor(rating) ? 'text-amber-400 fill-amber-400' : 'text-slate-600'}`} />
+                    ))}
                   </div>
-                  <div className="text-left sm:text-right flex-shrink-0">
-                    <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-blue-600">
-                      {formatPrice(property.price)}
-                    </div>
-                    <div className="text-xs sm:text-sm text-gray-500">{formatPrice(property.pricePerSqm)}/m²</div>
-                  </div>
-                </div>
-
-                {/* Méta - Responsive */}
-                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200">
-                  <span className="flex items-center gap-1">
-                    <span className="hidden sm:inline">Réf.</span> {property.reference}
-                  </span>
-                  <span className="hidden sm:inline">•</span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                    {property.publishedDate}
-                  </span>
-                  <span className="hidden sm:inline">•</span>
-                  <span className="flex items-center gap-1">
-                    <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
-                    {property.views}
-                  </span>
+                  <span className="font-semibold">{rating}</span>
+                  <span className="text-slate-400">({reviewCount} avis)</span>
                 </div>
               </div>
 
-              {/* Caractéristiques principales - Grid responsive */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 p-4 sm:p-6 bg-gray-50">
-                <div className="bg-white p-3 sm:p-4 rounded-lg text-center shadow-sm">
-                  <Maximize className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 mx-auto mb-1 sm:mb-2" />
-                  <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{property.features.surface}</div>
-                  <div className="text-xs sm:text-sm text-gray-600">m²</div>
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-lg"
+                >
+                  Demander un devis
+                </button>
+                <button 
+                  onClick={() => alert('Contact prestataire !')}
+                  className="px-8 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-colors backdrop-blur-sm border border-white/20"
+                >
+                  Nous contacter
+                </button>
+              </div>
+            </div>
+
+            <div className="flex justify-center">
+              <div className="w-64 h-64 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 flex items-center justify-center shadow-2xl">
+                {Icon && <Icon className="w-32 h-32 text-blue-400" />}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Bar */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-6 py-6">
+          <div className="grid grid-cols-3 gap-8">
+            {stats.map((stat, idx) => {
+              const StatIcon = stat.icon;
+              return (
+                <div key={idx} className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                    <StatIcon className="w-6 h-6 text-slate-600" />
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-slate-900">{stat.value}</div>
+                    <div className="text-sm text-slate-600">{stat.label}</div>
+                  </div>
                 </div>
-                <div className="bg-white p-3 sm:p-4 rounded-lg text-center shadow-sm">
-                  <Home className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 mx-auto mb-1 sm:mb-2" />
-                  <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{property.features.rooms}</div>
-                  <div className="text-xs sm:text-sm text-gray-600">Pièces</div>
-                </div>
-                <div className="bg-white p-3 sm:p-4 rounded-lg text-center shadow-sm">
-                  <Bed className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 mx-auto mb-1 sm:mb-2" />
-                  <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{property.features.bedrooms}</div>
-                  <div className="text-xs sm:text-sm text-gray-600">Chambres</div>
-                </div>
-                <div className="bg-white p-3 sm:p-4 rounded-lg text-center shadow-sm">
-                  <Bath className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 mx-auto mb-1 sm:mb-2" />
-                  <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{property.features.bathrooms}</div>
-                  <div className="text-xs sm:text-sm text-gray-600">SDB</div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Contenu principal */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Navigation Tabs */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+              <div className="border-b border-slate-200">
+                <div className="flex">
+                  {[
+                    { id: 'overview', label: 'Vue d\'ensemble', icon: FileText },
+                    { id: 'features', label: 'Caractéristiques', icon: CheckCircle2 },
+                    { id: 'deliverables', label: 'Livrables', icon: Package }
+                  ].map((tab) => {
+                    const TabIcon = tab.icon;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex-1 px-6 py-4 font-medium transition-all flex items-center justify-center gap-2 border-b-2 ${
+                          activeTab === tab.id
+                            ? 'border-slate-900 text-slate-900 bg-slate-50'
+                            : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                        }`}
+                      >
+                        <TabIcon className="w-4 h-4" />
+                        {tab.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Tabs navigation - Mobile friendly */}
-              <div className="flex overflow-x-auto border-b border-gray-200 bg-white">
-                {['description', 'details', 'equipements', 'energie'].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 sm:px-6 py-3 sm:py-4 text-sm sm:text-base font-medium whitespace-nowrap transition-colors ${
-                      activeTab === tab
-                        ? 'text-blue-600 border-b-2 border-blue-600'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    {tab === 'description' && 'Description'}
-                    {tab === 'details' && 'Détails'}
-                    {tab === 'equipements' && 'Équipements'}
-                    {tab === 'energie' && 'Énergie'}
-                  </button>
-                ))}
-              </div>
-
-              {/* Contenu des tabs */}
-              <div className="p-4 sm:p-6">
-                {activeTab === 'description' && (
-                  <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Description</h2>
-                    <p className="text-sm sm:text-base text-gray-700 leading-relaxed">{property.description}</p>
-                  </div>
-                )}
-
-                {activeTab === 'details' && (
-                  <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Détails du bien</h2>
-                    <div className="space-y-2 sm:space-y-3">
-                      <div className="flex justify-between py-2 sm:py-3 border-b border-gray-200">
-                        <span className="text-sm sm:text-base text-gray-600">Étage</span>
-                        <span className="text-sm sm:text-base font-semibold text-gray-900">{property.features.floor}/{property.features.totalFloors}</span>
-                      </div>
-                      <div className="flex justify-between py-2 sm:py-3 border-b border-gray-200">
-                        <span className="text-sm sm:text-base text-gray-600">Parking</span>
-                        <span className="text-sm sm:text-base font-semibold text-gray-900">{property.features.parking} place</span>
-                      </div>
-                      <div className="flex justify-between py-2 sm:py-3 border-b border-gray-200">
-                        <span className="text-sm sm:text-base text-gray-600">Balcon</span>
-                        <span className="text-sm sm:text-base font-semibold text-gray-900">{property.features.balcony} m²</span>
-                      </div>
-                      <div className="flex justify-between py-2 sm:py-3 border-b border-gray-200">
-                        <span className="text-sm sm:text-base text-gray-600">Construction</span>
-                        <span className="text-sm sm:text-base font-semibold text-gray-900">{property.features.yearBuilt}</span>
-                      </div>
-                      <div className="flex justify-between py-2 sm:py-3 border-b border-gray-200">
-                        <span className="text-sm sm:text-base text-gray-600">Rénovation</span>
-                        <span className="text-sm sm:text-base font-semibold text-gray-900">{property.features.yearRenovated}</span>
-                      </div>
+              <div className="p-8">
+                {activeTab === 'overview' && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-4">Description détaillée</h3>
+                      <p className="text-slate-700 leading-relaxed">{service.description}</p>
                     </div>
-                  </div>
-                )}
 
-                {activeTab === 'equipements' && (
-                  <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Équipements et services</h2>
-                    <div className="grid sm:grid-cols-2 gap-2 sm:gap-3">
-                      {property.amenities.map((amenity, idx) => {
-                        const Icon = amenity.icon;
-                        return (
-                          <div key={idx} className="flex items-center gap-3 bg-gray-50 p-3 sm:p-4 rounded-lg">
-                            <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0" />
-                            <span className="text-sm sm:text-base text-gray-700">{amenity.label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'energie' && (
-                  <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Performance énergétique</h2>
-                    <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
-                      <div className="bg-gray-50 p-4 sm:p-6 rounded-lg">
-                        <div className="text-xs sm:text-sm font-semibold text-gray-700 mb-3">Consommation énergétique</div>
-                        <div className="flex items-center gap-3 sm:gap-4">
-                          <div className={`${energyColors[property.energyClass]} text-white w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center text-xl sm:text-2xl font-bold rounded`}>
-                            {property.energyClass}
-                          </div>
-                          <div className="text-xs sm:text-sm text-gray-600">
-                            Classe énergétique
-                          </div>
+                    {technologies.length > 0 && (
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-4">Technologies & Outils</h3>
+                        <div className="flex flex-wrap gap-2">
+                          {technologies.map((tech, idx) => (
+                            <span key={idx} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium border border-slate-200">
+                              {tech}
+                            </span>
+                          ))}
                         </div>
                       </div>
-                      <div className="bg-gray-50 p-4 sm:p-6 rounded-lg">
-                        <div className="text-xs sm:text-sm font-semibold text-gray-700 mb-3">Émissions GES</div>
-                        <div className="flex items-center gap-3 sm:gap-4">
-                          <div className={`${energyColors[property.gesClass]} text-white w-12 h-12 sm:w-14 sm:h-14 flex items-center justify-center text-xl sm:text-2xl font-bold rounded`}>
-                            {property.gesClass}
-                          </div>
-                          <div className="text-xs sm:text-sm text-gray-600">
-                            Indice GES
-                          </div>
+                    )}
+
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <Calendar className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-slate-900 mb-1">Délai de réalisation</div>
+                          <div className="text-slate-600">{displayDuration}</div>
                         </div>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'features' && service.features && (
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-4">Caractéristiques principales</h3>
+                    <div className="space-y-3">
+                      {service.features.map((feature, idx) => (
+                        <div key={idx} className="flex items-start gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                          <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <Check className="w-4 h-4 text-green-600" />
+                          </div>
+                          <span className="text-slate-700 leading-relaxed">{feature}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'deliverables' && service.deliverables && (
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-4">Ce que vous recevrez</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {service.deliverables.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                          <Package className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                          <span className="text-slate-700 font-medium">{item}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
             </div>
+
+            {/* Garanties professionnelles */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+              <h3 className="text-xl font-bold text-slate-900 mb-6">Nos engagements qualité</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Shield className="w-8 h-8 text-green-600" />
+                  </div>
+                  <div className="font-semibold text-slate-900 mb-1">Garantie Qualité</div>
+                  <div className="text-sm text-slate-600">Satisfaction garantie ou remboursé</div>
+                </div>
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Clock className="w-8 h-8 text-blue-600" />
+                  </div>
+                  <div className="font-semibold text-slate-900 mb-1">Respect des délais</div>
+                  <div className="text-sm text-slate-600">Livraison dans les temps convenus</div>
+                </div>
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Award className="w-8 h-8 text-purple-600" />
+                  </div>
+                  <div className="font-semibold text-slate-900 mb-1">Expertise certifiée</div>
+                  <div className="text-sm text-slate-600">Équipe qualifiée et expérimentée</div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Sidebar Contact - Sticky sur desktop, section sur mobile */}
+          {/* Sidebar Prix & Contact */}
           <div className="lg:col-span-1">
-            <div className="sticky top-4 space-y-4 sm:space-y-6">
-              
-              {/* Agent */}
-              <div className="bg-white rounded-lg sm:rounded-xl shadow-lg p-4 sm:p-6">
-                <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-                  <img 
-                    src={property.agent.photo} 
-                    alt={property.agent.name}
-                    className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover flex-shrink-0"
-                  />
-                  <div className="min-w-0">
-                    <div className="font-bold text-sm sm:text-base text-gray-900 truncate">{property.agent.name}</div>
-                    <div className="text-xs sm:text-sm text-gray-600 truncate">{property.agent.title}</div>
-                  </div>
+            <div className="sticky top-6 space-y-6">
+              {/* Card Prix */}
+              <div id="pricing" className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-slate-900 text-white p-6">
+                  <h3 className="text-lg font-bold mb-1">Formules disponibles</h3>
+                  <p className="text-slate-300 text-sm">Choisissez l'offre adaptée à vos besoins</p>
                 </div>
 
-                <div className="space-y-2 sm:space-y-3">
+                <div className="p-6">
+                  {/* Options */}
+                  {service.options && service.options.length > 0 && (
+                    <div className="space-y-3 mb-6">
+                      {service.options.map((option) => (
+                        <div
+                          key={option.id}
+                          onClick={() => setSelectedOption(option.id)}
+                          className={`relative p-4 rounded-lg cursor-pointer transition-all border-2 ${
+                            selectedOption === option.id
+                              ? 'border-slate-900 bg-slate-50'
+                              : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          {option.popular && (
+                            <div className="absolute -top-2 right-4 px-2 py-0.5 bg-blue-600 text-white text-xs font-bold rounded">
+                              RECOMMANDÉ
+                            </div>
+                          )}
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="font-bold text-slate-900">{option.name}</div>
+                            <div className="text-right">
+                              <div className="font-bold text-lg text-slate-900">{option.price.toLocaleString('fr-FR')} €</div>
+                            </div>
+                          </div>
+                          <div className="text-sm text-slate-600 mb-2">{option.desc}</div>
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <Clock className="w-3 h-3" />
+                            {option.duration}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Prix total */}
+                  {displayPrice && (
+                    <div className="bg-slate-50 rounded-lg p-4 mb-6">
+                      <div className="flex justify-between items-center mb-2 text-sm">
+                        <span className="text-slate-600">Prix HT</span>
+                        <span className="font-medium">{displayPrice.toLocaleString('fr-FR')} €</span>
+                      </div>
+                      <div className="flex justify-between items-center mb-3 text-sm">
+                        <span className="text-slate-600">TVA (20%)</span>
+                        <span className="font-medium">{(displayPrice * 0.2).toLocaleString('fr-FR')} €</span>
+                      </div>
+                      <div className="pt-3 border-t border-slate-200">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-slate-900">Total TTC</span>
+                          <span className="font-bold text-2xl text-slate-900">{(displayPrice * 1.2).toLocaleString('fr-FR')} €</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!displayPrice && service.price && (
+                    <div className="bg-slate-50 rounded-lg p-6 mb-6 text-center">
+                      <div className="text-xl font-bold text-slate-900 mb-2">{service.price}</div>
+                      <div className="text-sm text-slate-600">Un devis personnalisé sera établi selon vos besoins</div>
+                    </div>
+                  )}
+
+                  {/* CTA */}
                   <button 
-                    onClick={() => setShowContact(!showContact)}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 sm:py-3.5 px-4 text-sm sm:text-base font-semibold transition-colors flex items-center justify-center gap-2 rounded-lg"
+                    onClick={() => alert('Demande de devis envoyée !')}
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-4 rounded-lg transition-all shadow-lg mb-3"
                   >
-                    <Phone className="w-4 h-4 sm:w-5 sm:h-5" />
-                    {showContact ? property.agent.phone : 'Afficher le téléphone'}
+                    Demander un devis gratuit
                   </button>
                   
-                  <button className="w-full bg-gray-900 hover:bg-gray-800 text-white py-3 sm:py-3.5 px-4 text-sm sm:text-base font-semibold transition-colors flex items-center justify-center gap-2 rounded-lg">
-                    <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
-                    Email
-                  </button>
-
-                  <button className="w-full border-2 border-gray-300 hover:border-gray-900 text-gray-900 py-3 sm:py-3.5 px-4 text-sm sm:text-base font-semibold transition-colors flex items-center justify-center gap-2 rounded-lg">
-                    <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
-                    Demander une visite
+                  <button 
+                    onClick={() => alert('Calendrier ouvert !')}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-lg transition-all"
+                  >
+                    Planifier un rendez-vous
                   </button>
                 </div>
               </div>
 
-              {/* Calculateur - Collapsible sur mobile */}
-              <div className="bg-blue-50 rounded-lg sm:rounded-xl shadow-lg p-4 sm:p-6">
-                <h3 className="font-bold text-sm sm:text-base text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-                  Simuler mon prêt
-                </h3>
-                <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Prix du bien</span>
-                    <span className="font-semibold text-gray-900">{formatPrice(property.price)}</span>
+              {/* Card Prestataire */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h3 className="font-bold text-slate-900 mb-4">Votre interlocuteur</h3>
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="w-14 h-14 bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl flex items-center justify-center text-white font-bold text-lg">
+                    {provider.substring(0, 2).toUpperCase()}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Apport (20%)</span>
-                    <span className="font-semibold text-gray-900">{formatPrice(property.price * 0.2)}</span>
-                  </div>
-                  <div className="flex justify-between pb-2 sm:pb-3 border-b border-blue-200">
-                    <span className="text-gray-600">Prêt sur 25 ans</span>
-                    <span className="font-semibold text-gray-900">{formatPrice(property.price * 0.8)}</span>
-                  </div>
-                  <div className="pt-2 sm:pt-3">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2">
-                      <span className="text-gray-700 font-semibold">Mensualité estimée</span>
-                      <span className="text-lg sm:text-xl font-bold text-blue-600">
-                        {formatPrice((property.price * 0.8 * 1.02) / 300)}/mois
-                      </span>
+                  <div className="flex-1">
+                    <div className="font-bold text-slate-900">{provider}</div>
+                    <div className="flex items-center gap-1 text-sm mb-1">
+                      <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                      <span className="font-semibold">{providerRating}</span>
+                      <span className="text-slate-500">· Expert certifié</span>
                     </div>
-                    <div className="text-xs text-gray-600 mt-1">Taux 2% sur 25 ans</div>
                   </div>
                 </div>
-                <button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2.5 sm:py-3 mt-3 sm:mt-4 text-sm sm:text-base font-semibold transition-colors rounded-lg">
-                  Simulation détaillée
-                </button>
+
+                <div className="space-y-2">
+                  <button 
+                    onClick={() => alert('Email envoyé !')}
+                    className="w-full py-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 font-medium"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Envoyer un email
+                  </button>
+                  <button 
+                    onClick={() => alert('Appel en cours !')}
+                    className="w-full py-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 font-medium"
+                  >
+                    <Phone className="w-4 h-4" />
+                    Appeler maintenant
+                  </button>
+                </div>
+              </div>
+
+              {/* Confiance */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center">
+                <Shield className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                <div className="font-semibold text-slate-900 mb-1">Transaction sécurisée</div>
+                <div className="text-sm text-slate-600">Paiement protégé et données chiffrées</div>
               </div>
             </div>
           </div>
