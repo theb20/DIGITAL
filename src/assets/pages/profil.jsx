@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
 import { FileText, CreditCard, Settings, LogOut, Mail, Phone, SquareDot, Trash2, Moon, Sun, ArrowLeftFromLine } from "lucide-react";
 
 export default function ClientProfile() {
+  useEffect(()=>{
+    document.title = "Profil - Digital";
+  })
   const [activeSection, setActiveSection] = useState(null);
-   const location = useLocation();
-   const navigate = useNavigate();
   
   const client = {
     img: "",

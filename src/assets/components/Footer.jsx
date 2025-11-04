@@ -5,12 +5,10 @@ import { FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn } from "react-icons/f
 const Footer = () => {
     const location = useLocation();
     const isHomePage = location.pathname === "/";
-    const isBlogPage = location.pathname === "/blog";
     const isSignPage = location.pathname === "/sign";
     const isResetPage = location.pathname === "/reset";
     const isQuotePage = location.pathname === "/quote";
     const isPrivacyPage = location.pathname === "/privacy";
-    const isCardPage = location.pathname === "/card";
     const isProfilPage = location.pathname === "/profil";
     
   return (

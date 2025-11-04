@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Building2, ChevronRight, Check, ArrowRight, Briefcase, Target, Lightbulb, BarChart, Shield, Cog, FileText, Send, CheckCircle, MessageSquare, Calendar, Code, Palette, Zap, CheckSquare, Printer, Camera, Mail, X  } from 'lucide-react';
   import {useNavigate} from 'react-router-dom';
   import { services } from '../constant/servicesData.js';
 
 export default function ServicesPage() {
+  useEffect(()=>{
+      document.title = "Nos services - Digital";
+    })
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState('Tous');
   const [searchQuery, setSearchQuery] = useState('');

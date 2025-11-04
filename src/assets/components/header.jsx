@@ -47,11 +47,6 @@ const Header = ({openPopup}) => {
       closeAllMenus();
     };
 
-    // Fonction pour ouvrir le popup et fermer les menus
-    const handleOpenPopup = (type) => {
-      openPopup(type);
-      closeAllMenus();
-    };
 
      // Sauvegarder la préférence du mode sombre dans localStorage
   useEffect(() => {
@@ -113,8 +108,8 @@ const Header = ({openPopup}) => {
               <>
                 {/* ===== Barre principale ===== */}
                 <div className="w-full flex justify-center items-center px-0 sm:px-4 lg:px-6 xl:px-8">
-                  <div className="w-full lg:w-4/5 xl:w-3/4 2xl:w-3/5 py-0 sm:py-3 lg:py-4">
-                    <div className="bg-white sm:rounded-full md:rounded-full lg:rounded-full shadow-sm lg:shadow-md overflow-hidden w-full">
+                  <div className="w-full overflow-hidden lg:w-4/5 xl:w-3/4 2xl:w-3/5 py-0 sm:py-3 lg:py-4 flex items-center justify-center">
+                    <div className="bg-white sm:rounded-full md:rounded-full lg:rounded-full shadow-sm lg:shadow-md overflow-hidden w-full lg:w-[calc(90%-20px)] md:w-[calc(90%-20px)] ">
                           <div className="flex items-center justify-between px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 py-3 md:py-3.5 lg:py-0 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
                               
                               {/* Bouton menu mobile */}

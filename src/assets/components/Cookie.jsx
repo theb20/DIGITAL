@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Cookie, X, Shield, ChevronDown, CheckCircle2, Info } from 'lucide-react';
+import { initAnalytics } from "../../firebase.js"
+
 
 const STORAGE_KEY = "ff_cookie_consent";
 const COOKIE_NAME = "ff_cookie_consent";
@@ -19,20 +21,27 @@ export default function CookiePopup() {
   const previouslyFocused = useRef(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed?.consented === true || parsed?.decisionDate) {
-          return;
-        }
-      } catch (e) {}
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved);
+      if (parsed?.preferences?.analytics) {
+        // ✅ L'utilisateur a déjà consenti, on initialise Analytics directement
+        initAnalytics();
+      }
+      if (parsed?.consented === true || parsed?.decisionDate) {
+        return;
+      }
+    } catch (e) {
+      console.error("Erreur lors de la lecture des cookies:", e);
     }
+  }
 
-    previouslyFocused.current = document.activeElement;
-    setIsVisible(true);
-    requestAnimationFrame(() => setIsAnimating(true));
-  }, []);
+  previouslyFocused.current = document.activeElement;
+  setIsVisible(true);
+  requestAnimationFrame(() => setIsAnimating(true));
+}, []);
+
 
   useEffect(() => {
     if (isVisible) {
@@ -59,21 +68,26 @@ export default function CookiePopup() {
     return () => window.removeEventListener("keydown", onKey);
   }, [isVisible]);
 
-  const saveConsent = (prefs, extra = {}) => {
-    const payload = {
-      preferences: prefs,
-      consented: !!(prefs.analytics || prefs.marketing || prefs.functional),
-      decisionDate: new Date().toISOString(),
-      ...extra
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-
-    try {
-      const expires = new Date();
-      expires.setFullYear(expires.getFullYear() + 1);
-      document.cookie = `${COOKIE_NAME}=${encodeURIComponent(JSON.stringify(payload))}; expires=${expires.toUTCString()}; path=/; samesite=lax`;
-    } catch (e) {}
+  const saveConsent = async (prefs, extra = {}) => {
+  const payload = {
+    preferences: prefs,
+    consented: !!(prefs.analytics || prefs.marketing || prefs.functional),
+    decisionDate: new Date().toISOString(),
+    ...extra
   };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+
+  try {
+    const expires = new Date();
+    expires.setFullYear(expires.getFullYear() + 1);
+    document.cookie = `${COOKIE_NAME}=${encodeURIComponent(JSON.stringify(payload))}; expires=${expires.toUTCString()}; path=/; samesite=lax`;
+  } catch (e) {}
+
+  // 🔥 Active Firebase Analytics si l'utilisateur a accepté les cookies analytiques
+  if (prefs.analytics) {
+    await initAnalytics();
+  }
+};
 
   const handleAcceptAll = () => {
     const prefs = { necessary: true, analytics: true, marketing: true, functional: true };

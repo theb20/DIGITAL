@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Building2, Code, Palette, Zap, CheckSquare, Printer, Camera, Search, Mail, ExternalLink, Eye, Filter, Grid3x3, LayoutGrid, X, Calendar, User, Tag } from 'lucide-react';
 
 export default function DigitalPortfolio() {
+  useEffect(()=>{
+        document.title = "Portfolio - Digital";
+    })
   const [activeCategory, setActiveCategory] = useState('Tous');
   const [viewMode, setViewMode] = useState('grid');
   const [selectedProject, setSelectedProject] = useState(null);

@@ -56,6 +56,8 @@ const PolicySection = ({
     indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
   };
 
+  
+
 
   return (
     <div id={`section-${id}`} className="bg-dark border border-gray-50 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md  transition-all duration-300 scroll-mt-24">
@@ -106,6 +108,9 @@ const InfoCard = ({id, icon, title, description }) => (
 );
 
 export default function PrivacyPolicyPage() {
+  useState(()=>{
+          document.title = "Transparence & Sécurité - Digital";
+      })
   const navigate = useNavigate();
   const [expandedSection, setExpandedSection] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);

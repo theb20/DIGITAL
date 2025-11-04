@@ -18,6 +18,7 @@ import Services from "./assets/pages/services.jsx"
 import Portfolio from "./assets/pages/portfolio.jsx"
 import Submission from "./assets/pages/submission.jsx"
 import FollowService from "./assets/pages/followService.jsx"
+import Logout from "./assets/pages/logout.jsx"
 
 // Page 404 optionnelle
 const NotFound = ({
@@ -151,10 +152,12 @@ function App() {
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/submission" element={<Submission />} />
             <Route path="/followService" element={<FollowService />} />
+            
           </Route>
 
           {/* Page 404 */}
           <Route path="*" element={<NotFound />} />
+          <Route path="/logout" element={<Logout />} />
         </Routes>
       </PopupProvider>
     </div>

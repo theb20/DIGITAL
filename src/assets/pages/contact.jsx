@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Building, User, MessageSquare, AlertCircle } from "lucide-react";
 
 const ContactPage = () => {
     useState(()=>{
-        document.title = "Contact - Filter Finder";
+        document.title = "Contact - Digital";
     })
+    const navigate = useNavigate();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -202,7 +204,9 @@ const ContactPage = () => {
             <div className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl shadow-sm p-6 text-white">
               <h3 className="text-xl font-bold mb-2">Questions fréquentes</h3>
               <p className="mb-4 text-white/90">Consultez notre FAQ pour des réponses rapides</p>
-              <button className="w-full py-2.5 bg-white text-amber-600 font-semibold rounded-lg hover:bg-slate-50 transition-colors">
+              <button 
+              onClick={() => navigate('/privacy#section-13')}
+              className="w-full py-2.5 bg-white text-amber-600 font-semibold rounded-lg hover:bg-slate-50 transition-colors">
                 Voir la FAQ
               </button>
             </div>

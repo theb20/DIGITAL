@@ -3,6 +3,9 @@ import { Search, Calendar, Clock, ArrowRight, TrendingUp, Bookmark, User, Share2
 import { useNavigate } from 'react-router-dom';
 
 export default function BlogPage() {
+  useEffect(()=>{
+      document.title = "Blog - Digital";
+    })
   const [selectedCategory, setSelectedCategory] = useState('Tous');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('grid');

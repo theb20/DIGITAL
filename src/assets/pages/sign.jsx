@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const AuthPage = () => {
+  useEffect(()=>{
+      document.title = "Connexion - Digital";
+    })
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSocialAuth = (provider) => {
