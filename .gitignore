@@ -7,7 +7,7 @@ pnpm-debug.log*
 lerna-debug.log*
 nodemon-debug.log*
 
-# Dependency directories
+# Dependencies
 node_modules/
 
 # Runtime data
@@ -30,7 +30,7 @@ tmp/
 .eslintcache
 .parcel-cache/
 
-# Next.js / Vercel (si utilisé)
+# Next.js / Vercel
 .next/
 out/
 .vercel/
