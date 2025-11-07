@@ -1,14 +1,18 @@
 import React from "react";
 import { Routes, Route, Link } from "react-router-dom";
 import { PopupProvider } from "./assets/configurations/PopupContext.jsx";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Layout principal
 import Layout from "./assets/components/layout.jsx";
 
+// Composants
+import RequireAuth from "./assets/configurations/RequireAuth.jsx";
+import RequireAuth_admin from "./assets/configurations/RequireAuth_admin.jsx";
+
 // Pages
 import Sign from "./assets/pages/sign.jsx";
 import Contact from "./assets/pages/contact.jsx";
-import Basket from "./assets/pages/basket.jsx"; 
 import Card from "./assets/pages/card.jsx";
 import Home from "./assets/pages/home.jsx";
 import Profil from "./assets/pages/profil.jsx"
@@ -19,6 +23,8 @@ import Portfolio from "./assets/pages/portfolio.jsx"
 import Submission from "./assets/pages/submission.jsx"
 import FollowService from "./assets/pages/followService.jsx"
 import Logout from "./assets/pages/logout.jsx"
+import Backoffice from "./assets/pages/backoffice.jsx"
+import Inbox from "./assets/pages/inbox.jsx"
 
 // Page 404 optionnelle
 const NotFound = ({
@@ -136,30 +142,83 @@ const NotFound = ({
 function App() {
   return (
     <div className="min-h-screen relative h-full bg-white dark:bg-gray-900 transition-colors duration-300">
-      <PopupProvider>
-        <Routes>
-          {/* Routes avec layout global */}
-          <Route element={<Layout />}>
-            <Route index element={<Home />} />
-            <Route path="/sign" element={<Sign />} />
-            <Route path="/basket" element={<Basket />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/card" element={<Card />} />
-            <Route path="/profil" element={<Profil />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/portfolio" element={<Portfolio />} />
-            <Route path="/submission" element={<Submission />} />
-            <Route path="/followService" element={<FollowService />} />
-            
-          </Route>
+       <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+        <PopupProvider>
+          <Routes>
+            {/* Routes avec layout global */}
+            <Route element={<Layout />}>
+              <Route index element={<Home />} />
+              
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/card" element={<Card />} />
+              <Route path="/profil" element={
+                <RequireAuth>
+                  <Profil />
+                </RequireAuth>
+              } />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/portfolio" element={<Portfolio />} />
+              <Route path="/sign" element={<Sign />} />
+              <Route path="/inbox" element={
+                <RequireAuth>
+                  <Inbox />
+                </RequireAuth>
+              } />
+             
+              
+              
+            </Route>
 
-          {/* Page 404 */}
-          <Route path="*" element={<NotFound />} />
-          <Route path="/logout" element={<Logout />} />
-        </Routes>
-      </PopupProvider>
+            {/* Page 404 */}
+            <Route path="*" element={<NotFound />} />
+            <Route path="/logout" element={<Logout />} />
+            <Route path="/backoffice" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+            <Route path="/backoffice/dashboard" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+            <Route path="/backoffice/services" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+            <Route path="/backoffice/devis" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+              <Route path="/backoffice/messages" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+            <Route path="/backoffice/categories" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+            <Route path="/submission" element={
+                <RequireAuth>
+                  <Submission />
+                </RequireAuth>
+              } />
+              <Route path="/followService" element={
+                <RequireAuth>
+                  <FollowService />
+                </RequireAuth>
+              } />
+          </Routes>
+          
+          
+        </PopupProvider>
+      </GoogleOAuthProvider>
     </div>
   );
 }

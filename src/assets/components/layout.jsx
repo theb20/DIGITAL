@@ -4,6 +4,7 @@ import Header from './header.jsx';
 import Footer from './Footer.jsx';
 import Quote from './quote.jsx';
 import Cookie from './Cookie.jsx';
+import PostLoginChoice from './PostLoginChoice.jsx';
 
 export default function Layout() {
   const { activePopup, setActivePopup, closePopup } = usePopup();
@@ -14,6 +15,7 @@ export default function Layout() {
     '/admin',
     '/login',
     '/dashboard',
+    '/sign',
     // Ajoutez d'autres routes si nécessaire
   ];
   
@@ -23,6 +25,7 @@ export default function Layout() {
   
   const popupComponents = {
     quote: <Quote closePopup={closePopup} />,
+    postLoginChoice: <PostLoginChoice closePopup={closePopup} />,
   };
   
   return (

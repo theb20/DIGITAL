@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import session from "../configurations/services/session.js";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   FaSearch,
@@ -64,7 +65,10 @@ const Header = ({openPopup}) => {
     setDarkMode(!darkMode);
   };
 
-    
+  const emailCookie = session.getSessionEmail();
+  const avatarCookie = session.getAvatarUrl();
+  const isLoggedIn = session.isAuthenticated();
+
   return (
     <>
      {!isSignPage && !isBlogPage && !isResetPage && (
@@ -151,20 +155,49 @@ const Header = ({openPopup}) => {
                                   </div>
                               </nav>
 
-                              {/* Bouton de connexion */}
+                              {/* Espace utilisateur / connexion */}
                               <div className="flex items-center flex-shrink-0">
-
-                                
-                                  {/* Version mobile avec icône uniquement */}
+                                {/* Mobile */}
+                                {isLoggedIn ? (
+                                  <button
+                                    onClick={() => handleNavigation("/profil")}
+                                    className="lg:hidden p-1 rounded-full overflow-hidden border border-slate-200"
+                                    aria-label="Profil"
+                                  >
+                                    <img
+                                      src={avatarCookie || "/img/icons/user.png"}
+                                      alt="Avatar"
+                                      className="w-8 h-8 rounded-full object-cover"
+                                      onError={(e) => { e.currentTarget.src = "/img/icons/user.png"; }}
+                                    />
+                                  </button>
+                                ) : (
                                   <button 
                                     onClick={() => handleNavigation("/sign")}
                                     className="lg:hidden text-slate-600 hover:text-slate-900 transition-colors p-2"
-                                    aria-label="Connexon"
+                                    aria-label="Connexion"
                                   >
                                     <FaUser className="text-xl md:text-2xl" />
                                   </button>
+                                )}
 
-                                  {/* Version desktop avec texte */}
+                                {/* Desktop */}
+                                {isLoggedIn ? (
+                                  
+                                  <button
+                                    onClick={() => handleNavigation("/profil")}
+                                    className="hidden lg:flex items-center gap-2 py-2.5 lg:py-2 px-2 lg:my-2 lg:px-5 xl:px-6 rounded-full bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-all"
+                                  >
+                                    <span className="whitespace-nowrap">Mon profil</span>
+                                    <img
+                                      src={avatarCookie || "/img/icons/user.png"}
+                                      alt="Avatar"
+                                      className="w-8 h-8 rounded-full object-cover"
+                                      onError={(e) => { e.currentTarget.src = "/img/icons/user.png"; }}
+                                    />
+                                    
+                                  </button>
+                                ) : (
                                   <button 
                                     onClick={() => handleNavigation("/sign")}
                                     className=" hidden lg:flex bg-slate-100 hover:bg-slate-200 py-2.5 lg:py-3 px-4 lg:px-5 xl:px-6 rounded-full items-center gap-2 text-slate-700 hover:text-slate-900 transition-all font-medium text-sm xl:text-base"
@@ -172,6 +205,7 @@ const Header = ({openPopup}) => {
                                     <FaUser className="lg:hidden text-base xl:text-lg" />
                                     <span className="whitespace-nowrap">Connexion</span>
                                   </button>
+                                )}
                               </div>
                           </div>
                     </div>
@@ -198,10 +232,16 @@ const Header = ({openPopup}) => {
                         Services
                       </a>
                       <a 
-                        href="#" 
+                        onClick={() => handleNavigation("/portfolio")} 
                         className="hover:text-slate-900 transition-colors py-2"
                       >
                         Portfolio
+                      </a>
+                      <a 
+                        href="/inbox"
+                        className="hover:text-slate-900 transition-colors py-2"
+                      >
+                        Messagerie privée
                       </a>
                       <a 
                         onClick={() => navigate("/submission")} 

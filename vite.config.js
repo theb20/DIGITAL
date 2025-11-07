@@ -13,6 +13,18 @@ export default defineConfig({
     host: '0.0.0.0', // accessible sur le réseau local
     port: 3001,
     open: true,
-    strictPort: false,
+    strictPort: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/health': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
 })

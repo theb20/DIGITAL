@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Search, Building2, ChevronRight, Check, ArrowRight, Briefcase, Target, Lightbulb, BarChart, Shield, Cog, FileText, Send, CheckCircle, MessageSquare, Calendar, Code, Palette, Zap, CheckSquare, Printer, Camera, Mail, X  } from 'lucide-react';
-  import {useNavigate} from 'react-router-dom';
-  import { services } from '../constant/servicesData.js';
+import { Search, Building2, ChevronRight, Check, ArrowRight, Briefcase, Target, Lightbulb, BarChart, Shield, Cog, FileText, Send, CheckCircle, MessageSquare, Calendar, Code, Palette, Zap, CheckSquare, Printer, Camera, Mail, X, Eye  } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import servicesApi from '../configurations/services/services.js';
+import serviceCategoriesApi from '../configurations/services/serviceCategories.js';
 
 export default function ServicesPage() {
   useEffect(()=>{
@@ -10,6 +11,10 @@ export default function ServicesPage() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState('Tous');
   const [searchQuery, setSearchQuery] = useState('');
+  const [services, setServices] = useState([]);
+  const [loadingServices, setLoadingServices] = useState(false);
+  const [categoryById, setCategoryById] = useState({});
+  const [categoryIconById, setCategoryIconById] = useState({});
   const [showProposalForm, setShowProposalForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -22,20 +27,63 @@ export default function ServicesPage() {
     timeline: ''
   });
   const [formSubmitted, setFormSubmitted] = useState(false);
-  const categories = [
-  { name: 'Tous', icon: FileText },
-  { name: 'Pack PME', icon: Building2 },
-  { name: 'Développement Web', icon: Code },
-  { name: 'Design Graphique', icon: Palette },
-  { name: 'Identité Visuelle', icon: Zap },
-  { name: 'Gestion de Projet', icon: CheckSquare },
-  { name: 'Conception de Documents', icon: FileText },
-  { name: 'Print & Impression', icon: Printer },
-  { name: 'Photographie & Vidéo', icon: Camera },
-  { name: 'SEO & Référencement', icon: Search },
-  { name: 'Email Marketing', icon: Mail },
-  
-];
+  const iconMap = {
+    FileText, Building2, Code, Palette, Zap, CheckSquare, Printer, Camera, Search, Mail, Briefcase
+  };
+
+  const [categories, setCategories] = useState([
+    { name: 'Tous', icon: FileText },
+    { name: 'Pack PME', icon: Building2 },
+    { name: 'Développement Web', icon: Code },
+    { name: 'Design Graphique', icon: Palette },
+    { name: 'Identité Visuelle', icon: Zap },
+    { name: 'Gestion de Projet', icon: CheckSquare },
+    { name: 'Conception de Documents', icon: FileText },
+    { name: 'Print & Impression', icon: Printer },
+    { name: 'Photographie & Vidéo', icon: Camera },
+    { name: 'SEO & Référencement', icon: Search },
+    { name: 'Email Marketing', icon: Mail },
+  ]);
+
+  useEffect(() => {
+    // Charger catégories depuis l'API et construire les mappings
+    (async () => {
+      try {
+        const rows = await serviceCategoriesApi.list();
+        if (Array.isArray(rows)) {
+          const idToName = {};
+          const idToIcon = {};
+          const dynCats = [{ name: 'Tous', icon: FileText }];
+          rows.forEach((r) => {
+            idToName[r.id] = r.name;
+            idToIcon[r.id] = r.icon;
+            const IconComp = iconMap[r.icon] || FileText;
+            dynCats.push({ name: r.name, icon: IconComp });
+          });
+          setCategoryById(idToName);
+          setCategoryIconById(idToIcon);
+          setCategories(dynCats);
+        }
+      } catch (e) {
+        console.warn('Chargement catégories échoué, fallback catégories statiques.', e?.message || e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    // Charger services via GET
+    (async () => {
+      setLoadingServices(true);
+      try {
+        const rows = await servicesApi.list();
+        setServices(Array.isArray(rows) ? rows : []);
+      } catch (e) {
+        console.error('Erreur chargement services:', e?.message || e);
+      } finally {
+        setLoadingServices(false);
+      }
+    })();
+  }, []);
 
 
   const handleInputChange = (e) => {
@@ -65,27 +113,69 @@ export default function ServicesPage() {
   };
 
 
-const handleServiceClick = (service) => {
-  // On exclut l'icône
-  const { icon, ...serviceWithoutIcon } = service;
+const getServiceIcon = (service) => {
+  const iconName = categoryIconById[service.category_id];
+  return iconMap[iconName] || Briefcase;
+};
 
-  navigate('/card', { 
-    state: { 
-      service: serviceWithoutIcon, 
-      iconName: service.icon.name  
-    } 
+const getServiceCategoryLabel = (service) => {
+  return categoryById[service.category_id] || service.category || 'Autres';
+};
+
+const handleServiceClick = async (service) => {
+  // Incrémenter le compteur d'avis/consultations côté serveur puis naviguer
+  const current = Number(service.review_count);
+  const baseCount = Number.isFinite(current) ? current : 0;
+  const nextCount = baseCount + 1;
+
+  try {
+    if (service.id != null) {
+      await servicesApi.update(service.id, { review_count: nextCount });
+      // Mise à jour optimiste locale
+      setServices((prev) => (prev || []).map((s) => s.id === service.id ? { ...s, review_count: nextCount } : s));
+    }
+  } catch (e) {
+    console.warn('Impossible d’incrémenter review_count:', e?.message || e);
+  }
+
+  // Exclut l'icône (nous recalculerons côté /card si nécessaire) et transmet le compteur mis à jour
+  const { icon, ...serviceWithoutIcon } = service;
+  const updatedService = { ...serviceWithoutIcon, review_count: nextCount };
+
+  navigate('/card', {
+    state: {
+      service: updatedService,
+      iconName: categoryIconById[service.category_id] || 'Briefcase'
+    }
   });
 };
 
-  const filteredServices = services.filter(service => {
-    const matchesCategory = selectedCategory === 'Tous' || service.category === selectedCategory;
-    const matchesSearch = service.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         service.description.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredServices = (services || []).filter((service) => {
+    const catLabel = getServiceCategoryLabel(service);
+    const matchesCategory = selectedCategory === 'Tous' || catLabel === selectedCategory;
+    const title = (service.title || '').toLowerCase();
+    const desc = (service.description || '').toLowerCase();
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = title.includes(q) || desc.includes(q);
     return matchesCategory && matchesSearch;
   });
 
   const featuredServices = filteredServices.filter(s => s.featured);
   const regularServices = filteredServices.filter(s => !s.featured);
+
+  const toNumberOrNull = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const formatPrice = (svc) => {
+    const priceType = (svc.price_type || '').toLowerCase();
+    const n = toNumberOrNull(svc.price);
+    if (priceType === 'sur_devis' || n === 0) return 'Sur devis';
+    if (n !== null) return `${n} Fcfa`;
+    if (typeof svc.price === 'string' && svc.price.trim()) return `${svc.price} Fcfa`;
+    return 'Sur devis';
+  };
 
   return (
     <div className="min-h-screen bg-dark">
@@ -184,15 +274,17 @@ const handleServiceClick = (service) => {
             </div>
             <div className="grid lg:grid-cols-3 gap-8">
               {featuredServices.map((service) => {
-                const Icon = service.icon;
+                const Icon = getServiceIcon(service);
                 return (
                   <article
                     key={service.id}
                     className="group dark:bg-black/40 border-2 border-slate-100 dark:border-slate-800 rounded-lg p-8 hover:shadow-xl transition-all duration-300"
                   >
                     <div className="flex items-start justify-between mb-6">
-                      <div className="w-14 h-14 bg-dark rounded-lg flex items-center justify-center">
+                      <div className="w-14 h-14 bg-dark rounded-lg gap-2 flex items-center justify-center">
                         <Icon className="w-7 h-7 text-dark" />
+                        
+                        <span className="text-xs flex items-center text-gray-600 ml-1"><Eye className="w-4 h-4 text-dark pe-1" />{service.review_count}</span>
                       </div>
                       <span className="px-3 py-1 bg-blue-100 text-blue-900 text-xs font-bold rounded-full">
                         PREMIUM
@@ -204,20 +296,24 @@ const handleServiceClick = (service) => {
                     </h3>
 
                     <p className="text-sub mb-6 leading-relaxed">
-                      {service.description}
+                      {service.description?.length > 120
+                        ? `${service.description.slice(0, 120)}…`
+                        : service.description}
                     </p>
 
-                    <div className="mb-6">
-                      <h4 className="text-sm font-bold text-dark mb-3">Ce qui est inclus :</h4>
-                      <ul className="space-y-2">
-                        {service.features.slice(0, 3).map((feature, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-sub">
-                            <Check className="w-4 h-4 text-dark mt-0.5 flex-shrink-0" />
-                            <span>{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    {Array.isArray(service.features) && (
+                      <div className="mb-6">
+                        <h4 className="text-sm font-bold text-dark mb-3">Ce qui est inclus :</h4>
+                        <ul className="space-y-2">
+                          {service.features.slice(0, 3).map((feature, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-sub">
+                              <Check className="w-4 h-4 text-dark mt-0.5 flex-shrink-0" />
+                              <span>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between pt-6 border-t border-gray-200 mb-6">
                       <div>
@@ -226,7 +322,7 @@ const handleServiceClick = (service) => {
                       </div>
                       <div className="text-right">
                         <div className="text-xs text-gray-600 mb-1">Tarif</div>
-                        <div className="text-sm font-bold text-dark">{service.price}</div>
+                        <div className="text-sm font-bold text-dark">{formatPrice(service)}</div>
                       </div>
                     </div>
 
@@ -255,7 +351,7 @@ const handleServiceClick = (service) => {
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {regularServices.map((service) => {
-                const Icon = service.icon;
+                const Icon = getServiceIcon(service);
                 return (
                   <article
                     key={service.id}
@@ -264,9 +360,10 @@ const handleServiceClick = (service) => {
                     <div className="flex items-start justify-between mb-4">
                       <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-black/90 transition-colors">
                         <Icon className="w-6 h-6 text-gray-700 group-hover:text-white transition-colors" />
+                        
                       </div>
                       <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 dark:text-white text-gray-700 text-xs font-semibold rounded">
-                        {service.category}
+                        {getServiceCategoryLabel(service)}
                       </span>
                     </div>
 
@@ -278,19 +375,24 @@ const handleServiceClick = (service) => {
                       {service.description}
                     </p>
 
-                    <div className="mb-4">
-                      <ul className="space-y-1.5">
-                        {service.features.slice(0, 3).map((feature, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-xs text-gray-600">
-                            <Check className="w-3 h-3 text-dark mt-0.5 flex-shrink-0" />
-                            <span className="text-sub">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    {Array.isArray(service.features) && (
+                      <div className="mb-4">
+                        <ul className="space-y-1.5">
+                          {service.features.slice(0, 3).map((feature, idx) => (
+                            <li key={idx} className="flex items-start gap-2 text-xs text-gray-600">
+                              <Check className="w-3 h-3 text-dark mt-0.5 flex-shrink-0" />
+                              <span className="text-sub">{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                                             
+
                       <div className="text-xs text-gray-600">
+                        <span className="text-xs flex items-center text-gray-600 ml-1"><Eye className="w-4 h-4 text-dark pe-1" />{service.review_count}</span>
                         <span className="font-semibold text-sub ">{service.duration}</span>
                       </div>
                       <button 
@@ -337,7 +439,7 @@ const handleServiceClick = (service) => {
                 </div>
               </div>
               <button 
-                onClick={() => setShowProposalForm(true)}
+                onClick={() => navigate('/submission')}
                 className="px-8 py-4 border border-dark dark:border-none bg-dark dark:bg-slate-800 text-dark font-semibold rounded hover:bg-blue-800 transition-colors inline-flex items-center gap-2 text-lg"
               >
                 Soumettre ma demande
@@ -348,204 +450,7 @@ const handleServiceClick = (service) => {
         </div>
       </div>
 
-      {/* Proposal Form Modal */}
-      {showProposalForm && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            {!formSubmitted ? (
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Soumettre une demande</h2>
-                    <p className="text-gray-600 mt-1">Décrivez-nous votre projet en détail</p>
-                  </div>
-                  <button 
-                    onClick={() => setShowProposalForm(false)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Nom complet *
-                      </label>
-                      <input
-                        type="text"
-                        name="name"
-                        required
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                        placeholder="Jean Dupont"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Entreprise *
-                      </label>
-                      <input
-                        type="text"
-                        name="company"
-                        required
-                        value={formData.company}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                        placeholder="Nom de votre entreprise"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Email professionnel *
-                      </label>
-                      <input
-                        type="email"
-                        name="email"
-                        required
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                        placeholder="jean.dupont@entreprise.fr"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Téléphone
-                      </label>
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                        placeholder="+33 1 23 45 67 89"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">
-                      Type de service recherché *
-                    </label>
-                    <select
-                      name="serviceType"
-                      required
-                      value={formData.serviceType}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                    >
-                      <option value="">Sélectionnez un service</option>
-                      <option value="strategie">Stratégie digitale</option>
-                      <option value="transformation">Transformation organisationnelle</option>
-                      <option value="architecture">Architecture d'entreprise</option>
-                      <option value="innovation">Innovation & R&D</option>
-                      <option value="performance">Optimisation des performances</option>
-                      <option value="cybersecurite">Cybersécurité & Conformité</option>
-                      <option value="autre">Autre / Sur-mesure</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">
-                      Description du projet *
-                    </label>
-                    <textarea
-                      name="description"
-                      required
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      rows={5}
-                      className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent resize-none"
-                      placeholder="Décrivez vos besoins, objectifs et contraintes..."
-                    />
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Budget estimé
-                      </label>
-                      <select
-                        name="budget"
-                        value={formData.budget}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                      >
-                        <option value="">Sélectionnez une fourchette</option>
-                        <option value="<50k">Moins de 50K€</option>
-                        <option value="50-100k">50K€ - 100K€</option>
-                        <option value="100-250k">100K€ - 250K€</option>
-                        <option value="250-500k">250K€ - 500K€</option>
-                        <option value=">500k">Plus de 500K€</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Délai souhaité
-                      </label>
-                      <select
-                        name="timeline"
-                        value={formData.timeline}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
-                      >
-                        <option value="">Sélectionnez un délai</option>
-                        <option value="urgent">Urgent (moins d'1 mois)</option>
-                        <option value="1-3mois">1 à 3 mois</option>
-                        <option value="3-6mois">3 à 6 mois</option>
-                        <option value=">6mois">Plus de 6 mois</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setShowProposalForm(false)}
-                      className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-900 font-semibold rounded hover:bg-gray-50 transition-colors"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      type="submit"
-                      className="flex-1 px-6 py-3 bg-blue-900 text-white font-semibold rounded hover:bg-blue-800 transition-colors inline-flex items-center justify-center gap-2"
-                    >
-                      Envoyer la demande
-                      <Send className="w-4 h-4" />
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              <div className="p-8 text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <CheckCircle className="w-10 h-10 text-green-600" />
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  Demande envoyée avec succès !
-                </h2>
-                <p className="text-gray-600 mb-6">
-                  Merci pour votre confiance. Nos experts analyseront votre demande et vous contacteront sous 24-48h avec une proposition détaillée.
-                </p>
-                <button
-                  onClick={() => setShowProposalForm(false)}
-                  className="px-6 py-3 bg-blue-900 text-white font-semibold rounded hover:bg-blue-800 transition-colors"
-                >
-                  Fermer
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      
 
       {/* CTA Section */}
       <div className="bg-dark dark:bg-slate-800">

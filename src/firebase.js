@@ -1,6 +1,7 @@
 // firebaseConfig.js
 import { initializeApp } from "firebase/app";
 import { getAnalytics, isSupported } from "firebase/analytics";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA31eWb6Ibloz1fQN-tVZdpaihzkP4tfbY",
@@ -12,10 +13,13 @@ const firebaseConfig = {
   measurementId: "G-JPD49CF8ZR"
 };
 
+// Initialiser l'app Firebase une seule fois et exposer Storage
+export const app = initializeApp(firebaseConfig);
+export const storage = getStorage(app);
+
 let analyticsInstance = null;
 
 export async function initAnalytics() {
-  const app = initializeApp(firebaseConfig);
   const supported = await isSupported();
   if (supported) {
     analyticsInstance = getAnalytics(app);

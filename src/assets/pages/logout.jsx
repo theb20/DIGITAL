@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
+import { logout as logoutService } from "../configurations/services/auth.js";
 
 // Simple page de déconnexion avec fond vidéo (overlay) pour l'application "Digital"
 // Tailwind CSS requis pour le style.
 
 export default function GoodbyePage() {
-    useState(()=>{
-            document.title = "Déconnexion - Digital";
-        })
+  useEffect(() => {
+    document.title = "Déconnexion - Digital";
+    // S'assure que la session est marquée déconnectée côté serveur
+    logoutService();
+  }, []);
   const [countdown, setCountdown] = useState(10);
 
   useEffect(() => {

@@ -1,0 +1,2 @@
+category_id,title,description,duration,price,price_type,image_url,is_active
+1,Nom du service,Description,2h,150000,fixe,https://exemple.com/image.jpg,true

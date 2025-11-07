@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import api from "../configurations/api/api_axios.js";
 
 /**
  * PAGE DE SOUMISSION DE DEVIS – VERSION ULTRA PROFESSIONNELLE
@@ -17,15 +18,72 @@ export default function SoumissionDevis() {
     fichier: null,
   });
 
+  const [submitting, setSubmitting] = useState(false);
+
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     setFormData({ ...formData, [name]: files ? files[0] : value });
   };
 
-  const handleSubmit = (e) => {
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      const base64 = String(result).includes(',') ? String(result).split(',')[1] : String(result);
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Devis soumis:", formData);
-    alert("Votre demande de devis a été transmise avec succès. Un expert vous contactera sous 24h.");
+    if (submitting) return;
+    setSubmitting(true);
+
+    try {
+      // 1) Préparer le fichier en base64 (si présent)
+      let file_base64 = null;
+      let file_name = null;
+      let mime_type = "application/pdf";
+      if (formData.fichier instanceof File) {
+        file_base64 = await fileToBase64(formData.fichier);
+        file_name = formData.fichier.name;
+        mime_type = formData.fichier.type || mime_type;
+      }
+
+      // 2) Envoi des données vers l’endpoint Google Drive
+      const payload = {
+        full_name: formData.nom,
+        email: formData.email,
+        phone: formData.telephone || null,
+        service_id: null,
+        project_type: formData.typeProjet || null,
+        project_description: formData.description,
+        file_name,
+        file_base64,
+        mime_type,
+      };
+
+      await api.post("/devis/requests/with-file", payload);
+
+      // 3) Feedback utilisateur + reset
+      alert("Votre demande de devis a été transmise avec succès. Un expert vous contactera sous 24h.");
+      setFormData({
+        nom: "",
+        email: "",
+        telephone: "",
+        typeProjet: "",
+        budget: "",
+        description: "",
+        fichier: null,
+      });
+    } catch (err) {
+      console.error("Erreur soumission devis:", err);
+      alert(err?.message || "Erreur lors de l'envoi du devis");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -147,9 +205,10 @@ export default function SoumissionDevis() {
           {/* CTA */}
           <button
             type="submit"
-            className="w-full py-4 rounded-xl bg-black hover:bg-black/80 text-white text-lg font-semibold shadow-xl transition transform hover:-translate-y-0.5"
+            disabled={submitting}
+            className={`w-full py-4 rounded-xl text-white text-lg font-semibold shadow-xl transition transform hover:-translate-y-0.5 ${submitting ? 'bg-black/60 cursor-not-allowed' : 'bg-black hover:bg-black/80'}`}
           >
-            Soumettre ma demande
+            {submitting ? 'Envoi en cours…' : 'Soumettre ma demande'}
           </button>
         </form>
 

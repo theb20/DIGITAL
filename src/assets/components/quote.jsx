@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import QuotePreview from './QuotePreview'; 
 import { 
   Building, User, Mail, Phone, MapPin, Calendar, Plus, Trash2, 
@@ -8,11 +8,14 @@ import {
   TrendingUp, Share2, Camera, Video, ShoppingCart, Code
 } from "lucide-react";
 
-const QuoteComponent = ({closePopup}) => {
+import api from '../configurations/api/api_axios.js';
+
+const QuoteComponent = ({ closePopup, mode = 'client', request = null }) => {
   const [showPreview, setShowPreview] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [respondSuccess, setRespondSuccess] = useState(false);
 
   // Services digitaux avec icônes et descriptions
   const digitalServices = [
@@ -275,6 +278,62 @@ TVA non applicable – Article 293 B du CGI.`,
       currency: 'XOF',
       minimumFractionDigits: 0,
     }).format(value);
+  };
+
+  // Préremplissage BackOffice depuis la demande
+  useEffect(() => {
+    if (mode === 'backoffice' && request) {
+      setQuoteData(prev => ({
+        ...prev,
+        clientType: prev.clientType || 'entreprise',
+        clientName: request.full_name || prev.clientName,
+        clientCompany: prev.clientCompany,
+        clientEmail: request.email || prev.clientEmail,
+        clientPhone: request.phone || prev.clientPhone,
+        projectCategory: request.project_type || prev.projectCategory,
+        notes: (request.project_description ? `Demande initiale:\n${request.project_description}\n\n` : '') + (prev.notes || ''),
+      }));
+    }
+  }, [mode, request]);
+
+  const sendBackofficeResponse = async ({ estimation_amount, delivery_time, message, pdf_base64 = null, pdf_name = null }) => {
+    if (!request?.id) throw new Error('Demande introuvable');
+    // Récupérer l'utilisateur courant pour remplir provider_id
+    let currentUserId = null;
+    try {
+      const userModule = await import('../configurations/services/user.js');
+      const currentUser = await userModule.getCurrentUser();
+      currentUserId = currentUser?.id || null;
+    } catch (_) {
+      currentUserId = null;
+    }
+    if (!currentUserId) {
+      throw new Error("Utilisateur non connecté ou introuvable. Veuillez vous reconnecter.");
+    }
+    const basePayload = {
+      request_id: request.id,
+      provider_id: currentUserId,
+      estimation_amount: Number(estimation_amount) || 0,
+      delivery_time: delivery_time || null,
+      message: message || null,
+      status: 'envoyé',
+    };
+
+    if (pdf_base64 && pdf_name) {
+      await api.post('/devis/submissions/with-pdf', {
+        ...basePayload,
+        pdf_base64,
+        pdf_name,
+        mime_type: 'application/pdf',
+      });
+    } else {
+      await api.post('/devis/submissions', basePayload);
+    }
+
+    // Mettre à jour le statut de la demande
+    await api.put(`/devis/requests/${request.id}`, { status: 'envoyé' });
+    setRespondSuccess(true);
+    setTimeout(() => setRespondSuccess(false), 3000);
   };
 
   const getCategoryColor = (color) => {
@@ -1209,11 +1268,23 @@ TVA non applicable – Article 293 B du CGI.`,
       {showPreview && (
   <QuotePreview
     quoteData={quoteData}
+    request={request}
+    mode={mode}
     onClose={() => setShowPreview(false)}
     onSend={handleSend}
     onDownload={handleDownload}
+    onRespond={mode === 'backoffice' ? sendBackofficeResponse : undefined}
   />
 )}
+
+      {respondSuccess && (
+        <div className="fixed bottom-6 right-6 p-4 bg-green-50 border-2 border-green-200 rounded-lg shadow flex items-center gap-2 text-green-700 z-1000">
+          <CheckCircle className="w-5 h-5" />
+          <span className="font-medium">
+            {`Devis envoyé avec succès à ${(request?.email || request?.client_email || request?.contact?.email || 'le client')}`}
+          </span>
+        </div>
+      )}
     </div>
   );
 };

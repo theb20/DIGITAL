@@ -48,7 +48,13 @@ export default function CardPage() {
   const displayDuration = selectedOptionData?.duration || service.duration;
 
   const rating = service.rating || 4.8;
-  const reviewCount = service.reviewCount || 150;
+  const reviewCount = (() => {
+    const a = Number(service.review_count);
+    if (Number.isFinite(a)) return a;
+    const b = Number(service.reviewCount);
+    if (Number.isFinite(b)) return b;
+    return 0;
+  })();
   const provider = service.provider || "Prestataire Pro";
   const providerRating = service.providerRating || 4.7;
   const technologies = service.technologies || [];

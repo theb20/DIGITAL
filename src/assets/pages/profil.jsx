@@ -1,21 +1,43 @@
 import { useState, useEffect } from "react";
-import { FileText, CreditCard, Settings, LogOut, Mail, Phone, SquareDot, Trash2, Moon, Sun, ArrowLeftFromLine } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import session from "../configurations/services/session.js";
+import userService from "../configurations/services/user.js";
+import { FileText, CreditCard, Settings, Mail, Phone, SquareDot, Trash2, Moon, Sun, ArrowLeftFromLine } from "lucide-react";
+import LogoutButton from "../components/LogoutButton.jsx";
 
 export default function ClientProfile() {
+  const navigate = useNavigate();
   useEffect(()=>{
     document.title = "Profil - Digital";
   })
   const [activeSection, setActiveSection] = useState(null);
   
-  const client = {
+  const [client, setClient] = useState({
     img: "",
-    name: "Jean Dupont",
-    company: "Entreprise Alpha",
-    email: "jean.dupont@email.com",
-    phone: "+33 6 12 34 56 78",
-    plan: "Abonnement Pro",
+    name: "",
+    company: "",
+    email: "",
+    phone: "",
+    plan: "",
     status: "Actif",
-  };
+  });
+
+  useEffect(() => {
+    const email = session.getSessionEmail();
+    const avatar = session.getAvatarUrl();
+    setClient((c) => ({ ...c, img: avatar || c.img, email: email || c.email }));
+    userService.getCurrentUser()
+      .then((u) => {
+        if (!u) return;
+        setClient((c) => ({
+          ...c,
+          img: c.img || u.avatar || "",
+          name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || c.name || "Utilisateur",
+          email: u.email || c.email,
+        }));
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSectionClick = (section) => {
     setActiveSection(activeSection === section ? null : section);
@@ -61,6 +83,7 @@ export default function ClientProfile() {
               src={client.img || "/img/icons/user.png"}
               alt="Avatar client"
               className="w-20 h-20 rounded-full object-cover"
+              onError={(e) => { e.currentTarget.src = "/img/icons/user.png"; }}
             />
             <div>
               <h2 className="text-xl font-semibold text-dark dark:text-slate-200">{client.name}</h2>
@@ -77,10 +100,10 @@ export default function ClientProfile() {
               <Mail size={16} /> {client.email}
             </p>
             <p className="flex items-center gap-2">
-              <Phone size={16} /> {client.phone}
+              <Phone size={16} /> {client.phone || "Aucun numéro de téléphone"}
             </p>
             <p className="flex items-center gap-2">
-              <CreditCard size={16} /> {client.plan}
+              <CreditCard size={16} /> {client.plan || "Plan Free"}
             </p>
           </div>
 
@@ -209,6 +232,25 @@ export default function ClientProfile() {
                   <h3 className="text-lg font-semibold text-dark mb-4">Paramètres</h3>
                   <div className="space-y-3">
 
+                    {/* Bouton conditionnel vers le Backoffice (admin/manager uniquement) */}
+                    {(() => {
+                      const role = session.getSessionRole();
+                      const isAllowed = role === 'admin' || role === 'manager';
+                      if (!isAllowed) return null;
+                      return (
+                        <button
+                          onClick={() => navigate('/backoffice')}
+                          className="w-full flex items-center gap-3 bg-dark dark:bg-slate-700 dark:hover:bg-slate-600 p-4 rounded-lg dark:border-slate-700 border border-slate-200 transition-all text-left"
+                        >
+                          <ArrowLeftFromLine size={20} className="text-slate-700 dark:text-slate-200" />
+                          <div>
+                            <p className="font-medium text-slate-900 dark:text-slate-200">Accéder au Backoffice</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Gestion interne: projets, clients, équipe, factures</p>
+                          </div>
+                        </button>
+                      );
+                    })()}
+
                     <button className="w-full flex items-center gap-3 bg-dark dark:bg-slate-700 dark:hover:bg-slate-600 p-4 rounded-lg dark:border-slate-700 border border-slate-200 transition-all text-left">
                       <SquareDot size={20} className="text-slate-700" />
                       <div>
@@ -227,13 +269,7 @@ export default function ClientProfile() {
                       </div>
                     </button>
 
-                    <button className="w-full flex items-center gap-3 bg-dark dark:bg-slate-700 dark:hover:bg-slate-600 p-4 rounded-lg dark:border-slate-700 border border-slate-200 transition-all text-left">
-                      <LogOut size={20} className="text-slate-700" />
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-slate-200">Déconnexion</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Se déconnecter de votre compte</p>  
-                      </div>
-                    </button>
+                    <LogoutButton />
 
                     <button className="w-full flex items-center gap-3 bg-red-50 dark:bg-red-600/10 dark:hover:bg-red-700 p-4 rounded-lg dark:border-red-700 border border-red-200 transition-all text-left">
                       <Trash2 size={20} className="text-red-600 dark:hover:text-red-100" />

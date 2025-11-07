@@ -10,10 +10,11 @@ const Footer = () => {
     const isQuotePage = location.pathname === "/quote";
     const isPrivacyPage = location.pathname === "/privacy";
     const isProfilPage = location.pathname === "/profil";
+    const isInboxPage = location.pathname === "/inbox";
     
   return (
     <>
-    {!isSignPage && !isProfilPage && !isResetPage && !isQuotePage && !isPrivacyPage && (
+    {!isSignPage && !isProfilPage && !isResetPage && !isQuotePage && !isPrivacyPage && !isInboxPage && (
       <footer className=" text-gray-300 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
