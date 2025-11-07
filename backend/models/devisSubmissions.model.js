@@ -9,6 +9,13 @@ export const findById = async (id) => {
   return rows[0] || null;
 };
 
+export const findByRequestId = async (requestId) => {
+  return await query(
+    "SELECT * FROM devis_submissions WHERE request_id = ? ORDER BY created_at DESC",
+    [requestId]
+  );
+};
+
 export const create = async (data) => {
   const {
     request_id,

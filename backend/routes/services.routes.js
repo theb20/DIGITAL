@@ -6,6 +6,7 @@ const router = express.Router();
 router.get("/", Controller.list);
 router.get("/:id", Controller.get);
 router.post("/", Controller.create);
+router.post("/bulk", Controller.bulkCreate);
 router.put("/:id", Controller.update);
 router.delete("/:id", Controller.remove);
 

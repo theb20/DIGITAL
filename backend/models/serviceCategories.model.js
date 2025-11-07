@@ -1,5 +1,17 @@
 import { query } from "../config/db.js";
 
+export const ensureTable = async () => {
+  await query(
+    `CREATE TABLE IF NOT EXISTS service_categories (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL UNIQUE,
+      description TEXT DEFAULT NULL,
+      icon VARCHAR(100) DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`
+  );
+};
+
 export const findAll = async () => {
   return await query("SELECT * FROM service_categories ORDER BY created_at DESC");
 };

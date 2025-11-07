@@ -9,6 +9,11 @@ export const findById = async (id) => {
   return rows[0] || null;
 };
 
+export const findByEmail = async (email) => {
+  const rows = await query("SELECT * FROM users WHERE email = ?", [email]);
+  return rows[0] || null;
+};
+
 export const create = async (data) => {
   const {
     first_name,

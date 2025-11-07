@@ -1,5 +1,5 @@
 import express from "express";
-import * as Controller from "../controllers/serviceCategories.controller.js";
+import * as Controller from "../controllers/messages.controller.js";
 
 const router = express.Router();
 
@@ -8,6 +8,5 @@ router.get("/:id", Controller.get);
 router.post("/", Controller.create);
 router.put("/:id", Controller.update);
 router.delete("/:id", Controller.remove);
-router.post("/seed", Controller.seed);
 
 export default router;

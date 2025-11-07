@@ -6,6 +6,7 @@ const router = express.Router();
 router.get("/", Controller.list);
 router.get("/:id", Controller.get);
 router.post("/", Controller.create);
+router.post("/with-file", Controller.createWithFile);
 router.put("/:id", Controller.update);
 router.delete("/:id", Controller.remove);
 
