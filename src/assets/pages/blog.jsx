@@ -1,16 +1,24 @@
 import { useState, useEffect } from 'react';
-import { Search, Calendar, Clock, ArrowRight, TrendingUp, Bookmark, User, Share2, Eye, MessageCircle, Filter, ChevronRight, Sparkles, Award, GalleryHorizontalEnd, Cpu, Handshake, StickyNote, Wallpaper, Brain, Instagram, Twitter, Youtube, Moon, Sun } from 'lucide-react';
+import scraperService from '../configurations/services/scraper.js';
+import Reading from '../components/Reading.jsx'
+import blogsApi from '../configurations/services/blogs.js';
+import appSettingsApi from '../configurations/services/appSettings.js';
+import { Search, Calendar, Clock, ArrowRight, TrendingUp, Bookmark, User, Share2, Eye, MessageCircle, Filter, ChevronRight, Sparkles, Award, GalleryHorizontalEnd, Cpu, Handshake, StickyNote, Wallpaper, Brain, Instagram, Twitter, Youtube, Moon, Sun, X, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function BlogPage() {
-  useEffect(()=>{
-      document.title = "Blog - Digital";
-    })
+  useEffect(() => {
+    document.title = 'Blog - Digital';
+  }, []);
   const [selectedCategory, setSelectedCategory] = useState('Tous');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState('grid');
+  // Retiré: viewMode inutilisé
   const [savedArticles, setSavedArticles] = useState([]);
   const [scrolled, setScrolled] = useState(false);
+  const [scrapedArticles, setScrapedArticles] = useState([]);
+  const [dbArticles, setDbArticles] = useState([]);
+  const [scrapeError, setScrapeError] = useState(null);
+  const [dbError, setDbError] = useState(null);
   const [darkMode, setDarkMode] = useState(() => {
     // Récupérer la préférence depuis localStorage au chargement
     const saved = localStorage.getItem('darkMode');
@@ -19,6 +27,8 @@ export default function BlogPage() {
   
   const size = 14;
   const navigate = useNavigate();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedArticle, setSelectedArticle] = useState(null);
   
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -26,14 +36,192 @@ export default function BlogPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Chargement des articles via scraping (URL provenant des Paramètres si disponible, sinon .env)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      // 1) Lire l'URL depuis les paramètres (clé: blog_rss_url)
+      let url = import.meta.env.VITE_BLOG_SCRAPE_URL;
+      try {
+        const setting = await appSettingsApi.getByKey('blog_rss_url');
+        if (setting && setting.setting_value) {
+          url = String(setting.setting_value);
+          console.log('[Blog] blog_rss_url (Paramètres) =', url);
+        }
+      } catch (e) {
+        console.warn('[Blog] Impossible de lire blog_rss_url depuis Paramètres:', e?.message || e);
+      }
+      console.log('[Blog] URL de scraping utilisée =', url);
+
+      if (!url) {
+        console.warn('[Blog] Aucun VITE_BLOG_SCRAPE_URL défini, le scraping est ignoré.');
+        return; // Config non définie, on ignore
+      }
+
+      // Sélecteurs: RSS vs HTML (WordPress Gutenberg)
+      const rssSelectors = {
+        item: 'item',
+        title: 'title',
+        link: 'link',
+        excerpt: 'description',
+        image: 'enclosure, media\\:content',
+        date: 'pubDate'
+      };
+      const htmlSelectors = {
+        item: 'article.wp-block-post, article',
+        title: '.wp-block-post-title a, .entry-title a, h1, h2',
+        link: '.wp-block-post-title a, .entry-title a, a',
+        excerpt: '.wp-block-post-excerpt p, .entry-content p, p',
+        image: '.wp-block-post-featured-image img, .post-thumbnail img, img',
+        date: 'time.wp-block-post-date, time.entry-date, time, .date'
+      };
+      const isRss = /\/feed\/?$/i.test(url) || url.toLowerCase().includes('/feed');
+      const selectors = isRss ? rssSelectors : htmlSelectors;
+      console.log('[Blog] Sélecteurs utilisés pour le scraping =', selectors);
+
+      try {
+        console.log('[Blog] Appel du service de scraping avec URL =', url);
+        const items = await scraperService.scrape(url, selectors);
+        console.log('[Blog] Réponse scraping: items count =', Array.isArray(items) ? items.length : 0);
+        // Fallback: si 0 item sur une page HTML WordPress, tenter le flux RSS
+        if ((!Array.isArray(items) || items.length === 0) && !isRss) {
+          try {
+            const feedUrl = url.replace(/\/?$/, '/feed/');
+            console.log('[Blog] Aucun item via HTML, tentative RSS avec =', feedUrl);
+            const rssItems = await scraperService.scrape(feedUrl, rssSelectors);
+            console.log('[Blog] Réponse fallback RSS: items count =', Array.isArray(rssItems) ? rssItems.length : 0);
+            if (Array.isArray(rssItems) && rssItems.length > 0) {
+              items.splice(0, items.length, ...rssItems);
+            }
+          } catch (err) {
+            console.warn('[Blog] Fallback RSS a échoué:', err?.message || err);
+          }
+        }
+        if (!mounted) return;
+        const mapped = (items || []).map((it, idx) => ({
+          id: `scrape-${idx}-${(it.link || it.title || idx).toString()}`,
+          title: it.title || 'Article',
+          excerpt: it.excerpt || '',
+          category: 'Blog',
+          author: { name: new URL(url).hostname, role: 'Scrape', avatar: '/img/web-app-manifest-192x192.png' },
+          date: it.date || '',
+          readTime: '',
+          views: '—',
+          comments: 0,
+          image: it.image || '/img/og-image.png',
+          featured: false,
+          trending: false,
+          tags: ['Scrapé'],
+          link: it.link || url,
+        }));
+        console.log('[Blog] Articles mappés depuis le scraping =', mapped.length);
+        setScrapedArticles(mapped);
+      } catch (e) {
+        if (!mounted) return;
+        console.error('[Blog] Erreur pendant le scraping =', e);
+        setScrapeError(e.message || 'Erreur de scraping');
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // Log lorsque l'état des articles scrapés est mis à jour
+  useEffect(() => {
+    if (scrapedArticles && scrapedArticles.length >= 0) {
+      console.log('[Blog] État mis à jour: scrapedArticles count =', scrapedArticles.length);
+      if (scrapedArticles.length > 0) {
+        console.log('[Blog] Exemple des 3 premiers articles scrapés =', scrapedArticles.slice(0, 3));
+      }
+    }
+  }, [scrapedArticles]);
+
+  // Chargement des articles depuis la base de données (API /blogs)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const rows = await blogsApi.list();
+        const mapped = (rows || []).map((row) => ({
+          id: `db-${row.id}`,
+          dbId: row.id,
+          title: row.title || 'Article',
+          excerpt: row.excerpt || '',
+          category: 'Base',
+          author: {
+            name: row.author_name || 'Équipe',
+            role: row.author_role || '',
+            avatar: row.author_avatar || '/img/web-app-manifest-192x192.png'
+          },
+          content: row.content || '',
+          date: row.published_date ? new Date(row.published_date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) : '',
+          readTime: row.read_time || '',
+          viewsNumber: typeof row.views === 'number' ? row.views : (row.views ? Number(row.views) || 0 : 0),
+          views: (typeof row.views === 'number' ? row.views : (row.views ? Number(row.views) || 0 : 0)).toString(),
+          comments: row.comment_count || 0,
+          image: row.image_url || '/img/og-image.png',
+          featured: !!row.featured,
+          trending: !!row.trending,
+          tags: Array.isArray(row.tags) ? row.tags : [],
+          link: '#',
+        }));
+        if (!mounted) return;
+        setDbArticles(mapped);
+        console.log('[Blog] Articles chargés depuis la base =', mapped.length);
+      } catch (e) {
+        if (!mounted) return;
+        console.error('[Blog] Erreur de chargement DB =', e);
+        setDbError(e.message || 'Erreur base de données');
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const openArticle = async (article) => {
+    setSelectedArticle(article);
+    setIsModalOpen(true);
+    try {
+      if (article.id && String(article.id).startsWith('db-')) {
+        const dbId = article.dbId ?? Number(String(article.id).split('-')[1]);
+        const current = typeof article.viewsNumber === 'number' ? article.viewsNumber : (Number(article.views) || 0);
+        const next = current + 1;
+        await blogsApi.update(dbId, { views: next });
+        setDbArticles(prev => prev.map(a => a.id === article.id ? { ...a, viewsNumber: next, views: String(next) } : a));
+        setSelectedArticle(prev => prev ? { ...prev, viewsNumber: next, views: String(next) } : prev);
+      }
+    } catch (e) {
+      console.warn('[Blog] Incrément des vues échoué:', e?.message || e);
+    }
+  };
+
+  const closeArticle = () => {
+    setIsModalOpen(false);
+    setSelectedArticle(null);
+  };
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') closeArticle(); };
+    if (isModalOpen) window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isModalOpen]);
+
+  // Log des erreurs de chargement DB pour éviter variable non utilisée
+  useEffect(() => {
+    if (dbError) {
+      console.warn('[Blog] dbError =', dbError);
+    }
+  }, [dbError]);
+
   // Sauvegarder la préférence du mode sombre dans localStorage
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
     // Ajouter ou retirer la classe 'dark' sur le body pour une transition globale
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    const root = typeof document !== 'undefined' ? document.documentElement : null;
+    if (root && root.classList) {
+      if (darkMode) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
     }
   }, [darkMode]);
 
@@ -179,7 +367,8 @@ export default function BlogPage() {
     );
   };
 
-  const filteredArticles = articles.filter(article => {
+  const sourceArticles = [...articles, ...dbArticles, ...scrapedArticles];
+  const filteredArticles = sourceArticles.filter(article => {
     const matchesCategory = selectedCategory === 'Tous' || article.category === selectedCategory;
     const matchesSearch = article.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          article.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
@@ -312,12 +501,18 @@ export default function BlogPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-15 relative z-20">
+        {/* Scrape error banner */}
+        {scrapeError && (
+          <div className={`mb-4 p-3 rounded-lg ${darkMode ? 'bg-red-900 text-red-100' : 'bg-red-100 text-red-800'}`}>
+            Erreur de scraping: {scrapeError}
+          </div>
+        )}
         
         {/* Featured Articles - Hero Cards */}
         {featuredArticles.length > 0 && (
           <div className="mb-20">
             <div className="grid lg:grid-cols-2 gap-8">
-              {featuredArticles.map((article, idx) => (
+              {featuredArticles.map((article) => (
                 <article
                   key={article.id}
                   className={`group relative rounded-3xl overflow-hidden shadow-2xl hover:shadow-3xl transition-all duration-500 hover:-translate-y-2 ${
@@ -373,7 +568,7 @@ export default function BlogPage() {
                             <div className="text-sm text-white/70">{article.author.role}</div>
                           </div>
                         </div>
-                        <button className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-xl hover:bg-blue-50 transition-colors flex items-center gap-2">
+                        <button onClick={() => openArticle(article)} className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-xl hover:bg-blue-50 transition-colors flex items-center gap-2">
                           Lire
                           <ArrowRight className="w-4 h-4" />
                         </button>
@@ -486,7 +681,7 @@ export default function BlogPage() {
                           <div className={darkMode ? 'text-gray-500' : 'text-gray-500'}>{article.readTime}</div>
                         </div>
                       </div>
-                      <button className="text-blue-600 font-semibold text-sm hover:gap-2 inline-flex items-center gap-1 transition-all">
+                      <button onClick={() => openArticle(article)} className="text-blue-600 font-semibold text-sm hover:gap-2 inline-flex items-center gap-1 transition-all">
                         Lire
                         <ChevronRight className="w-4 h-4" />
                       </button>
@@ -577,7 +772,7 @@ export default function BlogPage() {
                           >
                             <Bookmark className={`w-4 h-4 ${savedArticles.includes(article.id) ? 'fill-blue-600 text-blue-600' : darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
                           </button>
-                          <button className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2">
+                          <button onClick={() => openArticle(article)} className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-colors flex items-center gap-2">
                             Lire l'article
                             <ArrowRight className="w-4 h-4" />
                           </button>
@@ -591,6 +786,16 @@ export default function BlogPage() {
           </div>
         )}
       </div>
+
+      {/* Modal Lecture Article */}
+      {isModalOpen && selectedArticle && (
+       <Reading 
+          article={selectedArticle}
+          onClose={closeArticle}
+          darkMode={darkMode}
+        />
+
+      )}
 
       {/* Premium Newsletter Section */}
       <div className="relative bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 text-white overflow-hidden mt-20">

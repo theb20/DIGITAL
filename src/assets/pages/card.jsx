@@ -1,16 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import * as Icons from 'lucide-react';
 import { ArrowLeft, Star, Check, Shield, Clock, Package, MessageCircle, Download, Share2, ChevronDown, ChevronUp, Mail, Phone, Award, Users, TrendingUp, Calendar, FileText, CheckCircle2 } from 'lucide-react';
 import CommentSection from '../components/comment.jsx';
+import commentsApi from '../configurations/services/comments.js';
+import session from '../configurations/services/session.js';
+import usersApi from '../configurations/services/user.js';
+import devisRequestsApi from '../configurations/services/devisRequests.js';
 
 export default function CardPage() {
   const { state } = useLocation();
   const navigate = useNavigate();
   
   const [selectedOption, setSelectedOption] = useState(null);
-  const [showAllFeatures, setShowAllFeatures] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (session.isAuthenticated()) {
+          const u = await usersApi.getCurrentUser();
+          if (mounted) setCurrentUser(u || null);
+        } else {
+          if (mounted) setCurrentUser(null);
+        }
+      } catch {
+        // Silent fail, keep currentUser null
+        if (mounted) setCurrentUser(null);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // Déstructurements avant tout return pour garantir l'ordre des hooks
+  const service = state?.service;
+  const iconName = state?.iconName;
+
+  // Initialiser l'option sélectionnée hors rendu pour éviter setState pendant render
+  useEffect(() => {
+    if (service && Array.isArray(service.options) && !selectedOption) {
+      const popularOption = service.options.find(o => o.popular);
+      setSelectedOption(popularOption?.id || service.options[0]?.id);
+    }
+  }, [service, selectedOption]);
 
   if (!state || !state.service) {
     return (
@@ -31,14 +65,10 @@ export default function CardPage() {
     );
   }
 
-  const { service, iconName } = state;
   const Icon = Icons[iconName];
 
   // Initialiser l'option sélectionnée
-  if (service.options && !selectedOption) {
-    const popularOption = service.options.find(o => o.popular);
-    setSelectedOption(popularOption?.id || service.options[0]?.id);
-  }
+  // (déplacé dans useEffect ci-dessus)
 
   const selectedOptionData = service.options 
     ? service.options.find(opt => opt.id === selectedOption)
@@ -59,14 +89,14 @@ export default function CardPage() {
   const providerRating = service.providerRating || 4.7;
   const technologies = service.technologies || [];
 
-  const stats = [
+  const STATS = [
     { icon: Users, label: 'Clients satisfaits', value: '500+' },
     { icon: Award, label: 'Années d\'expérience', value: '10+' },
     { icon: TrendingUp, label: 'Taux de réussite', value: '98%' }
   ];
 
   return (
-    <div className="min-h-screen bg-dark lg:pt-14 pt-0 bg-slate-50">
+    <div className="min-h-screen bg-dark lg:pt-24 pt-0 bg-slate-50">
       {/* Header professionnel */}
       <div className="bg-dark ">
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -292,7 +322,69 @@ export default function CardPage() {
               </div>
             </div>
 
-            <CommentSection initialComments={service.comments} />
+            <CommentSection 
+              title="Commentaires"
+              subtitle="Partagez votre avis sur ce service"
+              initialComments={service.comments || []}
+              loadComments={(() => {
+                const serviceDbId = service?.id;
+                return async () => {
+                  try {
+                    if (!serviceDbId) return [];
+                    const items = await commentsApi.listByService(serviceDbId);
+                    return Array.isArray(items) ? items : [];
+                  } catch (err) {
+                    console.warn('[Service Comments] Load failed:', err?.message || err);
+                    return [];
+                  }
+                };
+              })()}
+              onAddComment={(() => {
+                const serviceDbId = service?.id;
+                return async ({ author, text }) => {
+                  if (!currentUser || !currentUser.id) {
+                    throw new Error('AUTH_REQUIRED');
+                  }
+                  if (!serviceDbId) {
+                    throw new Error('SERVICE_ID_MISSING');
+                  }
+                  const payload = {
+                    user_id: currentUser.id,
+                    rating: null,
+                    review: text,
+                    likes: 0,
+                    dislikes: 0,
+                  };
+                  const created = await commentsApi.createForService(serviceDbId, payload);
+                  return {
+                    id: created.id,
+                    author: `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.name || currentUser.email || author,
+                    review: created.review,
+                    created_at: created.created_at,
+                    likes: created.likes,
+                    dislikes: created.dislikes,
+                    user_id: currentUser.id,
+                    avatarUrl: currentUser.avatar || null,
+                  };
+                };
+              })()}
+              requireAuth={true}
+              isAuthenticated={() => session.isAuthenticated()}
+              onRequireAuth={() => navigate('/sign')}
+              currentUser={currentUser}
+              onReact={async (commentId, type) => {
+                if (!currentUser || !currentUser.id) throw new Error('AUTH_REQUIRED');
+                try {
+                  const updated = type === 'like'
+                    ? await commentsApi.like(commentId, currentUser.id)
+                    : await commentsApi.dislike(commentId, currentUser.id);
+                  return updated;
+                } catch (err) {
+                  console.warn('[Service Comments] Reaction failed:', err?.message || err);
+                  return null;
+                }
+              }}
+            />
 
           </div>
 
@@ -370,7 +462,59 @@ export default function CardPage() {
 
                   {/* CTA */}
                   <button 
-                    onClick={() => alert('Demande de devis envoyée !')}
+                    onClick={async () => {
+                      try {
+                        // Exiger une session pour l'envoi direct
+                        if (!session.isAuthenticated()) {
+                          navigate('/sign');
+                          return;
+                        }
+
+                        // Récupérer l'utilisateur courant (si non déjà chargé)
+                        const user = currentUser || await usersApi.getCurrentUser();
+                        const fullName = `${user?.first_name || ''} ${user?.last_name || ''}`.trim() || user?.name || user?.fullname || '';
+                        const email = (user?.email || '').trim();
+                        const phone = user?.phone || user?.telephone || user?.mobile || null;
+
+                        // Préparer description du projet incluant le service demandé
+                        const projectDescription = [
+                          `Demande de devis pour le service "${service.title}" (${service.category})`,
+                          selectedOptionData ? `Option choisie: ${selectedOptionData.name}${selectedOptionData.desc ? ` - ${selectedOptionData.desc}` : ''}` : null,
+                          (selectedOptionData?.duration || service.duration) ? `Durée estimée: ${selectedOptionData?.duration || service.duration}` : null,
+                          (selectedOptionData?.price || service.price) ? `Prix indicatif: ${selectedOptionData?.price ? `${Number(selectedOptionData.price).toLocaleString('fr-FR')} €` : service.price}` : null,
+                          service.features && service.features.length ? `Caractéristiques: ${service.features.slice(0,5).join(', ')}` : null,
+                          '',
+                          'Merci de me contacter pour affiner le cahier des charges.'
+                        ].filter(Boolean).join('\n');
+
+                        // Si info critique manquante, rediriger vers formulaire dédié avec préremplissage
+                        if (!fullName || !email) {
+                          navigate('/submission', { state: {
+                            serviceId: service.id,
+                            serviceTitle: service.title,
+                            projectType: selectedOptionData?.name || null,
+                            projectDescription: projectDescription,
+                          } });
+                          return;
+                        }
+
+                        const payload = {
+                          user_id: user?.id || null,
+                          full_name: fullName,
+                          email,
+                          phone,
+                          service_id: service.id || null,
+                          project_type: selectedOptionData?.name || null,
+                          project_description: projectDescription,
+                          status: 'reçu',
+                        };
+
+                        await devisRequestsApi.create(payload);
+                        alert('Demande de devis envoyée !');
+                      } catch (e) {
+                        alert(e?.message || 'Erreur lors de l\'envoi de la demande de devis.');
+                      }
+                    }}
                     className="
                     px-8 py-3 
                     w-full
@@ -390,7 +534,13 @@ export default function CardPage() {
                   </button>
                   
                   <button 
-                    onClick={() => alert('Calendrier ouvert !')}
+                    onClick={() => {
+                      if (!session.isAuthenticated()) {
+                        navigate('/sign');
+                        return;
+                      }
+                      navigate('/rendezvous', { state: { serviceId: service.id, serviceTitle: service.title } });
+                    }}
                     className="px-8 w-full py-3 bg-dark hover:bg-white/20 text-dark rounded-lg font-medium transition-colors backdrop-blur-sm border border-white/20"
                   >
                     Planifier un rendez-vous

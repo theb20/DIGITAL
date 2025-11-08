@@ -9,6 +9,7 @@ import SearchComponent from '../components/search.jsx';
 import AboutDigital from '../components/AboutDigital.jsx';
 import Partnership from '../components/Partnership.jsx';
 import Contact from '../components/Contact.jsx';
+import Promo from '../components/Promo.jsx'
 
 export default function FilterFinderHome() {
     const navigate = useNavigate();
@@ -225,6 +226,10 @@ export default function FilterFinderHome() {
 
       </div>
        
+      </section>
+
+      <section>
+       <Promo/>
       </section>
 
       {/* About Digital Company */}

@@ -3,17 +3,18 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [
-    react({
-      babel: {
-        plugins: [['babel-plugin-react-compiler']],
-      },
-    }),
+    react(),
   ],
   server: {
     host: '0.0.0.0', // accessible sur le réseau local
     port: 3001,
     open: true,
     strictPort: true,
+    headers: {
+      // Désactive COOP/COEP en développement pour éviter les blocages postMessage
+      'Cross-Origin-Opener-Policy': 'unsafe-none',
+      'Cross-Origin-Embedder-Policy': 'unsafe-none',
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:3000',

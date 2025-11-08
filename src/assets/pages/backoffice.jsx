@@ -1,21 +1,629 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { Home, Users, ShoppingCart, FileText, Settings, LogOut, Menu, X, TrendingUp, DollarSign, Package, Search, Bell, ChevronDown, Eye, Edit, Trash2, Plus, Calendar, CreditCard, Activity, Award, Mail, Phone, MapPin, Filter, Download, Upload, Save, Send, Star, Clock, CheckCircle, XCircle, AlertCircle, Zap, Target, BarChart3, PieChart as PieChartIcon, TrendingDown, RefreshCw, Globe, Smartphone, Monitor, FileJson, FileSpreadsheet, Lock } from 'lucide-react';
+import { Home, Users, ShoppingCart, FileText, Settings, LogOut, Menu, X, TrendingUp, DollarSign, Package, Search, Bell, ChevronDown, Eye, Edit, Trash2, Plus, Calendar, CreditCard, Activity, Award, Mail, Phone, MapPin, Filter, Download, Upload, Save, Send, Star, Clock, CheckCircle, XCircle, AlertCircle, Zap, Target, BarChart3, PieChart as PieChartIcon, TrendingDown, RefreshCw, Globe, Smartphone, Monitor, FileJson, FileSpreadsheet, Lock, ArrowLeft, DivideSquare } from 'lucide-react';
 import serviceCategoriesApi from '../configurations/services/serviceCategories.js';
 import servicesApi from '../configurations/services/services.js';
 import devisRequestsApi from '../configurations/services/devisRequests.js';
 import messagesApi from '../configurations/messages/messages.js';
+import usersApi from '../configurations/services/user.js';
+import promosApi from '../configurations/services/promos.js';
+import appSettingsApi from '../configurations/services/appSettings.js';
+import blogsApi from '../configurations/services/blogs.js';
+import projectsApi from '../configurations/services/projects.js';
+import profilesApi from '../configurations/services/profiles.js';
+import api from '../configurations/api/api_axios.js';
 import session from '../configurations/services/session.js';
 import QuoteComponent from '../components/quote.jsx';
+import appointmentsApi from '../configurations/services/appointments.js';
+import notificationsApi from '../configurations/services/notifications.js';
 
 const BackofficeDigital = () => {
   const [activeMenu, setActiveMenu] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isOpenClient, setIsOpenClient] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [allDevisRequests, setAllDevisRequests] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const toggleMobileMenu = (e) => {
+    if (e) {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (typeof e.stopPropagation === 'function') e.stopPropagation();
+    }
+    setMobileMenuOpen((prev) => !prev);
+  };
+  const handleMobileMenuKeyDown = (e) => {
+    if (!e) return;
+    const key = e.key?.toLowerCase();
+    if (key === 'enter' || key === ' ') {
+      e.preventDefault();
+      toggleMobileMenu(e);
+    }
+  };
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const toggleUserMenu = (e) => {
+    if (e) {
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      if (typeof e.stopPropagation === 'function') e.stopPropagation();
+    }
+    setUserMenuOpen((prev) => !prev);
+  };
+  const closeUserMenu = () => setUserMenuOpen(false);
+  const handleUserMenuKeyDown = (e) => {
+    if (!e) return;
+    const key = e.key?.toLowerCase();
+    if (key === 'enter' || key === ' ') {
+      e.preventDefault();
+      toggleUserMenu(e);
+    }
+    if (key === 'escape') {
+      e.preventDefault();
+      closeUserMenu();
+    }
+  };
   const [dateRange, setDateRange] = useState('30days');
-  const [selectedProject, setSelectedProject] = useState(null);
+  const [activeTab, setActiveTab] = useState("Profil");
 
+  // Notifications (dernières soumissions devis)
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const LS_LAST_SEEN = 'backoffice_notifications_last_seen';
+
+  const loadNotifications = async () => {
+    try {
+      const items = await notificationsApi.listLatest(10);
+      setNotifications(items);
+      const lastSeenRaw = localStorage.getItem(LS_LAST_SEEN);
+      const lastSeen = lastSeenRaw ? new Date(lastSeenRaw) : null;
+      const count = items.filter(it => {
+        const created = it.created_at ? new Date(it.created_at) : null;
+        return created && (!lastSeen || created > lastSeen);
+      }).length;
+      setUnreadCount(count);
+    } catch (e) {
+      console.warn('Notifications: échec du chargement:', e?.message || e);
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const id = setInterval(loadNotifications, 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const toggleNotifications = () => {
+    setNotificationsOpen(v => !v);
+    try {
+      localStorage.setItem(LS_LAST_SEEN, new Date().toISOString());
+      setUnreadCount(0);
+    } catch (err) {
+      console.debug('Notifications: stockage indisponible ou quota dépassé', err?.message || err);
+    }
+  };
+  // Promos (CRUD dans Paramètres)
+  const [promos, setPromos] = useState([]);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState(null);
+  const [promoFormOpen, setPromoFormOpen] = useState(false);
+  const [promoFormData, setPromoFormData] = useState({
+    id: null,
+    title: '',
+    subtitle: '',
+    img_url: '',
+    billing_cycle_default: 'annual',
+    timer_end_at: '',
+    plans_json: [],
+    comparison_json: [],
+    enterprise_features_json: [],
+    is_active: 1,
+  });
+  // Champs JSON en mode "raw" pour une saisie libre et validation progressive
+  const [promoJsonRaw, setPromoJsonRaw] = useState({
+    plans_json: '[]',
+    comparison_json: '[]',
+    enterprise_features_json: '[]',
+  });
+  const [promoJsonErrors, setPromoJsonErrors] = useState({
+    plans_json: null,
+    comparison_json: null,
+    enterprise_features_json: null,
+  });
+
+  // App Settings (CRUD dans Paramètres)
+  const [appSettings, setAppSettings] = useState([]);
+  const [appSettingsLoading, setAppSettingsLoading] = useState(false);
+  const [appSettingsError, setAppSettingsError] = useState(null);
+  const [appSettingFormOpen, setAppSettingFormOpen] = useState(false);
+  const [appSettingFormData, setAppSettingFormData] = useState({
+    id: null,
+    setting_key: '',
+    setting_type: 'string',
+    description: '',
+    setting_value_raw: '',
+  });
+
+  // Profil (CRUD)
+  const [profiles, setProfiles] = useState([]);
+  const [profilesLoading, setProfilesLoading] = useState(false);
+  const [profilesError, setProfilesError] = useState(null);
+  const [profileFormOpen, setProfileFormOpen] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileFormData, setProfileFormData] = useState({
+    id: null,
+    title: '',
+    subtitle: '',
+    banner_url: '',
+    stats_json_raw: '[]',
+    services_json_raw: '[]',
+    values_json_raw: '[]',
+    team_json_raw: '[]',
+    is_active: 1,
+  });
+
+  const loadProfiles = async () => {
+    setProfilesLoading(true); setProfilesError(null);
+    try {
+      const rows = await profilesApi.list();
+      setProfiles(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      setProfilesError(e?.message || 'Erreur de chargement des profils');
+    } finally { setProfilesLoading(false); }
+  };
+
+  const openCreateProfile = () => {
+    setProfileFormData({
+      id: null,
+      title: '',
+      subtitle: '',
+      banner_url: '',
+      stats_json_raw: '[]',
+      services_json_raw: '[]',
+      values_json_raw: '[]',
+      team_json_raw: '[]',
+      is_active: 1,
+    });
+    setProfileFormOpen(true);
+  };
+
+  const openEditProfile = (p) => {
+    setProfileFormData({
+      id: p.id,
+      title: p.title || '',
+      subtitle: p.subtitle || '',
+      banner_url: p.banner_url || '',
+      stats_json_raw: JSON.stringify(p.stats_json ?? []),
+      services_json_raw: JSON.stringify(p.services_json ?? []),
+      values_json_raw: JSON.stringify(p.values_json ?? []),
+      team_json_raw: JSON.stringify(p.team_json ?? []),
+      is_active: p.is_active ? 1 : 0,
+    });
+    setProfileFormOpen(true);
+  };
+
+  const saveProfile = async () => {
+    setProfileSaving(true);
+    try {
+      const payload = {
+        title: profileFormData.title,
+        subtitle: profileFormData.subtitle,
+        banner_url: profileFormData.banner_url,
+        stats_json: isValidJson(profileFormData.stats_json_raw) ? JSON.parse(profileFormData.stats_json_raw) : [],
+        services_json: isValidJson(profileFormData.services_json_raw) ? JSON.parse(profileFormData.services_json_raw) : [],
+        values_json: isValidJson(profileFormData.values_json_raw) ? JSON.parse(profileFormData.values_json_raw) : [],
+        team_json: isValidJson(profileFormData.team_json_raw) ? JSON.parse(profileFormData.team_json_raw) : [],
+        is_active: profileFormData.is_active ? 1 : 0,
+      };
+
+      if (profileFormData.id) {
+        await profilesApi.update(profileFormData.id, payload);
+      } else {
+        await profilesApi.create(payload);
+      }
+      setProfileFormOpen(false);
+      await loadProfiles();
+    } catch (e) {
+      alert(e?.message || 'Erreur enregistrement profil');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const deleteProfile = async (id) => {
+    if (!confirm('Supprimer ce profil ?')) return;
+    try { await profilesApi.remove(id); await loadProfiles(); } catch (e) { alert(e?.message || 'Erreur suppression'); }
+  };
+
+  // Blogs (CRUD)
+  const [blogs, setBlogs] = useState([]);
+  const [blogsLoading, setBlogsLoading] = useState(false);
+  const [blogsError, setBlogsError] = useState(null);
+  const [blogFormOpen, setBlogFormOpen] = useState(false);
+  const [blogFormData, setBlogFormData] = useState({
+    id: null,
+    category_id: '',
+    title: '',
+    excerpt: '',
+    content: '',
+    author_name: '',
+    author_role: '',
+    author_avatar: '',
+    image_url: '',
+    published_date: '',
+    read_time: '',
+    featured: 0,
+    trending: 0,
+    tags_raw: '',
+  });
+
+  // Portfolio (CRUD dans Paramètres)
+  const [portfolioProjects, setPortfolioProjects] = useState([]);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [portfolioError, setPortfolioError] = useState(null);
+  const [portfolioFormOpen, setPortfolioFormOpen] = useState(false);
+  const [portfolioFormData, setPortfolioFormData] = useState({
+    id: null,
+    title: '',
+    category: '',
+    client: '',
+    year: '',
+    description: '',
+    image_url: '',
+    tags_raw: '',
+  });
+
+  const isValidJsonArray = (str) => {
+    try {
+      const val = JSON.parse(str);
+      return Array.isArray(val);
+    } catch {
+      return false;
+    }
+  };
+
+  const isValidJson = (str) => {
+    try { JSON.parse(str); return true; } catch { return false; }
+  };
+
+  const loadPromos = async () => {
+    setPromoLoading(true);
+    setPromoError(null);
+    try {
+      const list = await promosApi.list();
+      setPromos(Array.isArray(list) ? list : []);
+    } catch (e) {
+      setPromoError(e?.message || 'Erreur chargement des promos');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  useEffect(() => { loadPromos(); }, []);
+
+  const loadAppSettings = async () => {
+    setAppSettingsLoading(true);
+    setAppSettingsError(null);
+    try {
+      const list = await appSettingsApi.list();
+      setAppSettings(Array.isArray(list) ? list : []);
+    } catch (e) {
+      setAppSettingsError(e?.message || 'Erreur chargement des paramètres');
+    } finally {
+      setAppSettingsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'Paramètres Système') {
+      loadAppSettings();
+    }
+  }, [activeTab]);
+
+  const loadBlogs = async () => {
+    setBlogsLoading(true);
+    setBlogsError(null);
+    try {
+      const rows = await blogsApi.list();
+      setBlogs(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      setBlogsError(e?.message || 'Erreur chargement des articles');
+    } finally {
+      setBlogsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'Blog') {
+      loadBlogs();
+    }
+  }, [activeTab]);
+
+  const loadPortfolioProjects = async () => {
+    setPortfolioLoading(true);
+    setPortfolioError(null);
+    try {
+      const rows = await projectsApi.list();
+      setPortfolioProjects(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      setPortfolioError(e?.message || 'Erreur chargement des projets');
+    } finally {
+      setPortfolioLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'Portfolio') {
+      loadPortfolioProjects();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'Profil') {
+      loadProfiles();
+    }
+  }, [activeTab]);
+
+  const openCreatePromo = () => {
+    setPromoFormData({
+      id: null,
+      title: '',
+      subtitle: '',
+      img_url: '',
+      billing_cycle_default: 'annual',
+      timer_end_at: '',
+      plans_json: [],
+      comparison_json: [],
+      enterprise_features_json: [],
+      is_active: 1,
+    });
+    setPromoJsonRaw({ plans_json: '[]', comparison_json: '[]', enterprise_features_json: '[]' });
+    setPromoJsonErrors({ plans_json: null, comparison_json: null, enterprise_features_json: null });
+    setPromoFormOpen(true);
+  };
+
+  const openCreateAppSetting = () => {
+    setAppSettingFormData({
+      id: null,
+      setting_key: '',
+      setting_type: 'string',
+      description: '',
+      setting_value_raw: '',
+    });
+    setAppSettingFormOpen(true);
+  };
+
+  const openCreateBlog = () => {
+    const firstCategoryId = (serviceCategories && serviceCategories[0]?.id) || '';
+    setBlogFormData({
+      id: null,
+      category_id: firstCategoryId,
+      title: '',
+      excerpt: '',
+      content: '',
+      author_name: '',
+      author_role: '',
+      author_avatar: '',
+      image_url: '',
+      published_date: '',
+      read_time: '',
+      featured: 0,
+      trending: 0,
+      tags_raw: '',
+    });
+    setBlogFormOpen(true);
+  };
+
+  const openEditAppSetting = (s) => {
+    let raw = '';
+    if (s?.setting_type === 'json') {
+      try {
+        const parsed = typeof s.setting_value === 'string' ? JSON.parse(s.setting_value) : s.setting_value;
+        raw = JSON.stringify(parsed, null, 2);
+      } catch {
+        raw = String(s.setting_value ?? '');
+      }
+    } else {
+      raw = String(s.setting_value ?? '');
+    }
+    setAppSettingFormData({
+      id: s.id,
+      setting_key: s.setting_key || '',
+      setting_type: s.setting_type || 'string',
+      description: s.description || '',
+      setting_value_raw: raw,
+    });
+    setAppSettingFormOpen(true);
+  };
+
+  const openEditBlog = (b) => {
+    setBlogFormData({
+      id: b.id,
+      category_id: b.category_id || '',
+      title: b.title || '',
+      excerpt: b.excerpt || '',
+      content: typeof b.content === 'string' ? b.content : (b.content ? JSON.stringify(b.content, null, 2) : ''),
+      author_name: b.author_name || '',
+      author_role: b.author_role || '',
+      author_avatar: b.author_avatar || '',
+      image_url: b.image_url || '',
+      published_date: b.published_date ? String(b.published_date).slice(0,10) : '',
+      read_time: b.read_time || '',
+      featured: b.featured ? 1 : 0,
+      trending: b.trending ? 1 : 0,
+      tags_raw: Array.isArray(b.tags) ? b.tags.join(',') : (typeof b.tags === 'string' ? b.tags : ''),
+    });
+    setBlogFormOpen(true);
+  };
+
+  const saveAppSetting = async () => {
+    try {
+      // Validation clé
+      if (!appSettingFormData.setting_key?.trim()) {
+        throw new Error('La clé est obligatoire');
+      }
+      const type = appSettingFormData.setting_type;
+      const raw = appSettingFormData.setting_value_raw ?? '';
+      if (type === 'json' && raw.trim() && !isValidJson(raw)) {
+        throw new Error('Valeur JSON invalide');
+      }
+      const payload = {
+        setting_key: appSettingFormData.setting_key.trim(),
+        setting_type: type,
+        description: appSettingFormData.description ?? '',
+        // On envoie la valeur sous forme de chaîne; côté backend, elle sera stockée en LONGTEXT
+        setting_value: raw,
+      };
+      if (appSettingFormData.id) {
+        await appSettingsApi.update(appSettingFormData.id, payload);
+      } else {
+        await appSettingsApi.create(payload);
+      }
+      setAppSettingFormOpen(false);
+      await loadAppSettings();
+      alert('Paramètre enregistré');
+    } catch (e) {
+      alert(e?.message || 'Erreur enregistrement paramètre');
+    }
+  };
+
+  const deleteAppSetting = async (id) => {
+    if (!confirm('Supprimer ce paramètre ?')) return;
+    try {
+      await appSettingsApi.remove(id);
+      await loadAppSettings();
+    } catch (e) {
+      alert(e?.message || 'Erreur suppression paramètre');
+    }
+  };
+
+  const saveBlog = async () => {
+    try {
+      if (!blogFormData.title?.trim()) throw new Error('Le titre est obligatoire');
+      const payload = {
+        category_id: blogFormData.category_id ? Number(blogFormData.category_id) : null,
+        title: blogFormData.title.trim(),
+        excerpt: blogFormData.excerpt ?? '',
+        content: blogFormData.content ?? '',
+        author_name: blogFormData.author_name ?? '',
+        author_role: blogFormData.author_role ?? '',
+        author_avatar: blogFormData.author_avatar ?? '',
+        image_url: blogFormData.image_url ?? '',
+        published_date: blogFormData.published_date || null,
+        read_time: blogFormData.read_time ?? '',
+        featured: blogFormData.featured ? 1 : 0,
+        trending: blogFormData.trending ? 1 : 0,
+        tags: (blogFormData.tags_raw || '')
+          .split(',')
+          .map(t => t.trim())
+          .filter(Boolean),
+      };
+      if (!payload.category_id) throw new Error('La catégorie est requise');
+      if (blogFormData.id) {
+        await blogsApi.update(blogFormData.id, payload);
+      } else {
+        await blogsApi.create(payload);
+      }
+      setBlogFormOpen(false);
+      await loadBlogs();
+      alert('Article enregistré');
+    } catch (e) {
+      alert(e?.message || 'Erreur enregistrement article');
+    }
+  };
+
+  const deleteBlog = async (id) => {
+    if (!confirm('Supprimer cet article ?')) return;
+    try {
+      await blogsApi.remove(id);
+      await loadBlogs();
+    } catch (e) {
+      alert(e?.message || 'Erreur suppression article');
+    }
+  };
+
+  const openEditPromo = (p) => {
+    const safeParse = (v) => {
+      if (Array.isArray(v)) return v;
+      if (typeof v === 'string') {
+        try { const j = JSON.parse(v); return Array.isArray(j) ? j : []; } catch { return []; }
+      }
+      return [];
+    };
+    setPromoFormData({
+      id: p.id,
+      title: p.title || '',
+      subtitle: p.subtitle || '',
+      img_url: p.img_url || '',
+      billing_cycle_default: p.billing_cycle_default || 'annual',
+      timer_end_at: p.timer_end_at ? new Date(p.timer_end_at).toISOString().slice(0,16) : '',
+      plans_json: safeParse(p.plans_json),
+      comparison_json: safeParse(p.comparison_json),
+      enterprise_features_json: safeParse(p.enterprise_features_json),
+      is_active: p.is_active ? 1 : 0,
+    });
+    setPromoJsonRaw({
+      plans_json: JSON.stringify(safeParse(p.plans_json), null, 2),
+      comparison_json: JSON.stringify(safeParse(p.comparison_json), null, 2),
+      enterprise_features_json: JSON.stringify(safeParse(p.enterprise_features_json), null, 2),
+    });
+    setPromoJsonErrors({ plans_json: null, comparison_json: null, enterprise_features_json: null });
+    setPromoFormOpen(true);
+  };
+
+  const savePromo = async () => {
+    try {
+      // Valider et parser les JSON "raw"
+      const hasPlans = isValidJsonArray(promoJsonRaw.plans_json);
+      const hasComp = isValidJsonArray(promoJsonRaw.comparison_json);
+      const hasEnt  = isValidJsonArray(promoJsonRaw.enterprise_features_json);
+      setPromoJsonErrors({
+        plans_json: hasPlans ? null : 'JSON invalide (tableau attendu)',
+        comparison_json: hasComp ? null : 'JSON invalide (tableau attendu)',
+        enterprise_features_json: hasEnt ? null : 'JSON invalide (tableau attendu)'
+      });
+      if (!hasPlans || !hasComp || !hasEnt) {
+        throw new Error('Veuillez corriger les champs JSON avant de sauvegarder.');
+      }
+
+      const parsedPlans = JSON.parse(promoJsonRaw.plans_json);
+      const parsedComp  = JSON.parse(promoJsonRaw.comparison_json);
+      const parsedEnt   = JSON.parse(promoJsonRaw.enterprise_features_json);
+
+      const payload = {
+        title: promoFormData.title,
+        subtitle: promoFormData.subtitle,
+        img_url: promoFormData.img_url,
+        billing_cycle_default: promoFormData.billing_cycle_default,
+        timer_end_at: promoFormData.timer_end_at ? new Date(promoFormData.timer_end_at).toISOString().slice(0,19).replace('T',' ') : null,
+        plans_json: parsedPlans,
+        comparison_json: parsedComp,
+        enterprise_features_json: parsedEnt,
+        is_active: Number(promoFormData.is_active) ? 1 : 0,
+      };
+      if (promoFormData.id) {
+        await promosApi.update(promoFormData.id, payload);
+      } else {
+        await promosApi.create(payload);
+      }
+      setPromoFormOpen(false);
+      await loadPromos();
+      alert('Promo enregistrée');
+    } catch (e) {
+      alert(e?.message || 'Erreur enregistrement promo');
+    }
+  };
+
+  const deletePromo = async (id) => {
+    if (!confirm('Supprimer cette promo ?')) return;
+    try {
+      await promosApi.remove(id);
+      await loadPromos();
+    } catch (e) {
+      alert(e?.message || 'Erreur suppression promo');
+    }
+  };
   // Devis (quotes) state and helpers
   const [devisRequests, setDevisRequests] = useState([]);
   const [devisLoading, setDevisLoading] = useState(false);
@@ -23,6 +631,110 @@ const BackofficeDigital = () => {
   const [updatingDevisId, setUpdatingDevisId] = useState(null);
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [selectedDevisRequest, setSelectedDevisRequest] = useState(null);
+  const [showDevisDrawer, setShowDevisDrawer] = useState(false);
+  const [devisDrawerRequest, setDevisDrawerRequest] = useState(null);
+
+  // Édition des membres d'équipe
+  const [teamEditOpen, setTeamEditOpen] = useState(false);
+  const [teamEditData, setTeamEditData] = useState(null);
+  const openTeamEdit = (member) => {
+    setTeamEditData({ ...member });
+    setTeamEditOpen(true);
+  };
+  const closeTeamEdit = () => { setTeamEditOpen(false); setTeamEditData(null); };
+  const handleTeamEditChange = (field, value) => {
+    setTeamEditData((prev) => ({ ...prev, [field]: value }));
+  };
+  const saveTeamEdit = async () => {
+    if (!teamEditData?.id) return;
+    try {
+      const fullName = (teamEditData.nom || '').trim();
+      const parts = fullName.split(/\s+/).filter(Boolean);
+      const first_name = parts[0] || '';
+      const last_name = parts.slice(1).join(' ') || '';
+
+      // Normaliser le rôle saisi dans le sélecteur (Administrateur/Manager/Utilisateur)
+      const roleRaw = String(teamEditData.role || '').trim();
+      const roleNormalized = (
+        ['Administrateur', 'admin'].includes(roleRaw) ? 'admin' :
+        ['Manager', 'manager'].includes(roleRaw) ? 'manager' :
+        ['Utilisateur', 'User', 'user'].includes(roleRaw) ? 'user' : 'user'
+      );
+
+      const payload = {
+        email: teamEditData.email,
+        position: teamEditData.poste,
+        role: roleNormalized,
+        avatar: teamEditData.avatar,
+        first_name,
+        last_name,
+      };
+
+      await usersApi.update(teamEditData.id, payload);
+      // Recharge depuis la base pour refléter la mise à jour réelle
+      await loadTeamMembers();
+    } catch (e) {
+      console.error('Erreur mise à jour utilisateur:', e?.message || e);
+    } finally {
+      closeTeamEdit();
+    }
+  };
+
+  // Modale liste des utilisateurs (nouveau membre)
+  const [usersModalOpen, setUsersModalOpen] = useState(false);
+  const [usersList, setUsersList] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState(null);
+  const [usersQuery, setUsersQuery] = useState('');
+  const [selectedUserForRole, setSelectedUserForRole] = useState(null);
+  const [roleUpdateSaving, setRoleUpdateSaving] = useState(false);
+
+  const openUsersModal = async () => {
+    setUsersModalOpen(true);
+    setUsersLoading(true);
+    setUsersError(null);
+    try {
+      const users = await usersApi.list();
+      setUsersList(Array.isArray(users) ? users : []);
+    } catch (e) {
+      setUsersError(e?.message || 'Erreur de chargement des utilisateurs');
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+  const closeUsersModal = () => { setUsersModalOpen(false); setSelectedUserForRole(null); };
+  const canEditUserRole = (u) => String(u.role || '').toLowerCase() === 'user';
+  const startEditUserRole = (u) => { if (!canEditUserRole(u)) return; setSelectedUserForRole({ ...u, nextRole: 'manager' }); };
+  const handleChangeRoleSelection = (val) => { setSelectedUserForRole((prev) => ({ ...prev, nextRole: val })); };
+  const saveUserRoleUpdate = async () => {
+    if (!selectedUserForRole?.id || !selectedUserForRole?.nextRole) return;
+    setRoleUpdateSaving(true);
+    setUsersError(null);
+    try {
+      // Mettre à jour uniquement le rôle
+      await usersApi.update(selectedUserForRole.id, { role: String(selectedUserForRole.nextRole).toLowerCase() });
+      // Recharger la liste complète et l'équipe
+      await openUsersModal();
+      await loadTeamMembers();
+      setSelectedUserForRole(null);
+    } catch (e) {
+      setUsersError(e?.message || 'Impossible de mettre à jour le rôle');
+    } finally {
+      setRoleUpdateSaving(false);
+    }
+  };
+
+  // Filtres avancés pour les devis
+  const [showDevisFilters, setShowDevisFilters] = useState(false);
+  const [devisFilters, setDevisFilters] = useState({
+    query: '',
+    status: '',
+    project_type: '',
+    date_min: '',
+    date_max: '',
+    amount_min: '',
+    amount_max: '',
+  });
 
   const statusOptions = [
     { value: 'reçu', label: 'Reçu' },
@@ -109,6 +821,15 @@ const BackofficeDigital = () => {
     setSelectedDevisRequest(null);
   };
 
+  const openDevisDrawer = (req) => {
+    setDevisDrawerRequest(req || null);
+    setShowDevisDrawer(true);
+  };
+  const closeDevisDrawer = () => {
+    setShowDevisDrawer(false);
+    setDevisDrawerRequest(null);
+  };
+
   // Données Analytics
   const revenueData = [
     { month: 'Jan', revenus: 45000, depenses: 28000, profit: 17000 },
@@ -137,122 +858,148 @@ const BackofficeDigital = () => {
     { segment: 'Indépendants', value: 1900, color: '#10b981' },
   ];
 
-  const [projects, setProjects] = useState(() => [
-    { 
-      id: 1, 
-      nom: 'Refonte Site E-commerce', 
-      client: 'TechStore France',
-      statut: 'En cours', 
-      progression: 75,
-      budget: '45,000 €',
-      deadline: '2025-12-15',
-      priorite: 'Haute'
-    },
-    { 
-      id: 2, 
-      nom: 'Application Mobile iOS', 
-      client: 'FitLife App',
-      statut: 'En cours', 
-      progression: 45,
-      budget: '65,000 €',
-      deadline: '2026-01-30',
-      priorite: 'Haute'
-    },
-    { 
-      id: 3, 
-      nom: 'Dashboard Analytics', 
-      client: 'DataViz Corp',
-      statut: 'En révision', 
-      progression: 90,
-      budget: '28,000 €',
-      deadline: '2025-11-20',
-      priorite: 'Moyenne'
-    },
-    { 
-      id: 4, 
-      nom: 'Campagne SEO', 
-      client: 'BioMarket',
-      statut: 'Planifié', 
-      progression: 15,
-      budget: '12,000 €',
-      deadline: '2025-12-01',
-      priorite: 'Basse'
-    },
-    { 
-      id: 5, 
-      nom: 'Intégration CRM', 
-      client: 'SalesForce Pro',
-      statut: 'Terminé', 
-      progression: 100,
-      budget: '38,000 €',
-      deadline: '2025-10-31',
-      priorite: 'Haute'
-    },
-  ]);
+  const [projects, setProjects] = useState([]);
+  const mapUserToProject = (u) => ({
+    id: u.id,
+    nom: `${u.first_name || ''} ${u.last_name || ''}`.trim() || (u.email || 'Utilisateur'),
+    client: u.email || '',
+    statut: (u.session_status === 'connected' || u.is_active) ? 'Actif' : 'Inactif',
+    progression: 0,
+    budget: '—',
+    deadline: (u.created_at ? new Date(u.created_at).toISOString().slice(0,10) : ''),
+    priorite: 'Moyenne',
+  });
   useEffect(() => {
-    const saved = localStorage.getItem('bo_projects');
-    if (saved) {
-      try { setProjects(JSON.parse(saved)); } catch (e) {}
-    }
+    const loadUsers = async () => {
+      try {
+        const res = await api.get('/users');
+        const list = Array.isArray(res.data) ? res.data : [];
+        console.info('[Backoffice] Chargé /users pour Projects:', {
+          length: list.length,
+          baseURL: api?.defaults?.baseURL,
+        });
+        setProjects(list.map(mapUserToProject));
+      } catch (e) {
+        console.warn('Backoffice: échec du chargement des utilisateurs', e?.message || e);
+      }
+    };
+    loadUsers();
   }, []);
+
+  const [clients, setClients] = useState([]);
+  const mapUserToClient = (u, extra = {}) => ({
+    id: u.id ?? extra.id ?? u.email ?? extra.email ?? Math.random().toString(36).slice(2),
+    avatar: u.avatar || extra.avatar || '/img/icons/user.png',
+    nom: `${u.first_name || ''} ${u.last_name || ''}`.trim() || extra.full_name || (u.email || 'Utilisateur'),
+    contact: `${u.first_name || ''} ${u.last_name || ''}`.trim() || extra.full_name || '',
+    email: u.email || extra.email || '',
+    telephone: u.telephone || extra.phone || '—',
+    projets: extra.requestsCount ?? '—',
+    valeur: '—',
+    statut: (u.session_status === 'connected' || u.is_active || (extra.requestsCount && extra.requestsCount > 0)) ? 'Actif' : 'Inactif',
+    depuis: (extra.lastRequestAt
+      ? new Date(extra.lastRequestAt).toISOString().slice(0,10)
+      : (u.created_at ? new Date(u.created_at).toISOString().slice(0,10) : '')
+    ),
+  });
   useEffect(() => {
-    localStorage.setItem('bo_projects', JSON.stringify(projects));
-  }, [projects]);
+    const loadClients = async () => {
+      try {
+        const [users, requests] = await Promise.all([
+          usersApi.list(),
+          devisRequestsApi.list(),
+        ]);
+      const usersArr = Array.isArray(users) ? users : [];
+      const reqArr = Array.isArray(requests) ? requests : [];
+      console.info('[Backoffice] Clients - users & devisRequests:', {
+        users: usersArr.length,
+        requests: reqArr.length,
+        baseURL: api?.defaults?.baseURL,
+      });
 
-  const clients = [
-    { 
-      id: 1, 
-      nom: 'TechStore France', 
-      contact: 'Sophie Martin',
-      email: 'sophie@techstore.fr', 
-      telephone: '+33 6 12 34 56 78',
-      projets: 3,
-      valeur: '125,000 €',
-      statut: 'Actif',
-      depuis: '2023-03-15'
-    },
-    { 
-      id: 2, 
-      nom: 'FitLife App', 
-      contact: 'Marc Dubois',
-      email: 'marc@fitlife.com', 
-      telephone: '+33 6 98 76 54 32',
-      projets: 2,
-      valeur: '95,000 €',
-      statut: 'Actif',
-      depuis: '2023-07-22'
-    },
-    { 
-      id: 3, 
-      nom: 'DataViz Corp', 
-      contact: 'Julie Bernard',
-      email: 'julie@dataviz.io', 
-      telephone: '+33 6 45 67 89 01',
-      projets: 4,
-      valeur: '180,000 €',
-      statut: 'Actif',
-      depuis: '2022-11-08'
-    },
-    { 
-      id: 4, 
-      nom: 'BioMarket', 
-      contact: 'Pierre Roux',
-      email: 'pierre@biomarket.fr', 
-      telephone: '+33 6 23 45 67 89',
-      projets: 1,
-      valeur: '45,000 €',
-      statut: 'Nouveau',
-      depuis: '2025-10-01'
-    },
-  ];
+      // Conserver toutes les demandes de devis pour le panneau client
+      setAllDevisRequests(reqArr);
 
-  const team = [
-    { id: 1, nom: 'Alexandre Dubois', role: 'CEO & Founder', email: 'alex@digital.com', projets: 12, disponibilite: 85, avatar: 'AD' },
-    { id: 2, nom: 'Marie Laurent', role: 'Lead Designer', email: 'marie@digital.com', projets: 8, disponibilite: 60, avatar: 'ML' },
-    { id: 3, nom: 'Thomas Bernard', role: 'Full Stack Dev', email: 'thomas@digital.com', projets: 6, disponibilite: 45, avatar: 'TB' },
-    { id: 4, nom: 'Sarah Petit', role: 'Marketing Manager', email: 'sarah@digital.com', projets: 10, disponibilite: 70, avatar: 'SP' },
-    { id: 5, nom: 'Lucas Martin', role: 'DevOps Engineer', email: 'lucas@digital.com', projets: 5, disponibilite: 90, avatar: 'LM' },
-  ];
+        const byEmail = new Map();
+        for (const r of reqArr) {
+          const email = (r.email || '').trim().toLowerCase();
+          if (!email) continue;
+          const prev = byEmail.get(email) || { requests: [], count: 0, lastRequestAt: null, full_name: r.full_name || '', phone: r.phone || null };
+          const createdAt = r.created_at || r.updated_at || null;
+          const lastAt = prev.lastRequestAt && createdAt ? (new Date(prev.lastRequestAt) > new Date(createdAt) ? prev.lastRequestAt : createdAt) : (createdAt || prev.lastRequestAt);
+          byEmail.set(email, {
+            requests: [...prev.requests, r],
+            count: prev.count + 1,
+            lastRequestAt: lastAt,
+            full_name: prev.full_name || r.full_name || '',
+            phone: prev.phone || r.phone || null,
+          });
+        }
+
+        const clientsList = [];
+        for (const [email, info] of byEmail.entries()) {
+          const user = usersArr.find(u => String(u.email || '').trim().toLowerCase() === email);
+          if (user) {
+            clientsList.push(mapUserToClient(user, { requestsCount: info.count, lastRequestAt: info.lastRequestAt }));
+          } else {
+            clientsList.push({
+              id: email,
+              avatar: info.avatar || '/img/icons/user.png',
+              nom: info.full_name || email,
+              contact: info.full_name || '',
+              email,
+              telephone: info.phone || '—',
+              projets: info.count,
+              valeur: '—',
+              statut: 'Actif',
+              depuis: info.lastRequestAt ? new Date(info.lastRequestAt).toISOString().slice(0,10) : '',
+            });
+          }
+        }
+
+        console.info('[Backoffice] Clients dérivés:', { total: clientsList.length });
+        setClients(clientsList);
+      } catch (e) {
+        console.warn('Backoffice: échec du chargement des clients', e?.message || e);
+      }
+    };
+    loadClients();
+  }, []);
+
+  const [teamMembers, setTeamMembers] = useState([]);
+
+  const loadTeamMembers = async () => {
+    try {
+      const users = await usersApi.list();
+      const adminsManagers = (Array.isArray(users) ? users : [])
+        .filter(u => {
+          const r = (u.role || '').toLowerCase();
+          return r === 'admin' || r === 'manager';
+        })
+        .map(u => {
+          const first = (u.first_name || '').trim();
+          const last = (u.last_name || '').trim();
+          const roleLabel = (u.role || '').toLowerCase() === 'admin' ? 'Administrateur' : 'Manager';
+          return {
+            id: u.id,
+            nom: (first || last) ? (first + (first && last ? ' ' : '') + last) : (u.email || 'Utilisateur'),
+            role: roleLabel,
+            email: u.email || '',
+            poste: u.position || '',
+            projets: 0,
+            disponibilite: 80,
+            avatar: u.avatar || '/img/icons/user.png',
+          };
+        });
+      setTeamMembers(adminsManagers);
+    } catch (e) {
+      console.warn('Backoffice: échec du chargement des membres de l\'équipe', e?.message || e);
+      setTeamMembers([]);
+    }
+  };
+
+  useEffect(() => { loadTeamMembers(); }, []);
+
 
   const invoices = [
     { id: '#INV-2025-089', client: 'TechStore France', montant: '12,500 €', statut: 'Payée', date: '2025-11-01', echeance: '2025-11-15' },
@@ -783,9 +1530,10 @@ const BackofficeDigital = () => {
     { id: 'dashboard', name: 'Tableau de bord', icon: Home, path: '/backoffice/dashboard' },
     { id: 'projects', name: 'Services', icon: Package, path: '/backoffice/services' },
     { id: 'devis', name: 'Suivi devis', icon: FileText, path: '/backoffice/devis' },
-    { id: 'settings', name: 'Catégories', icon: Settings, path: '/backoffice/categories' },
+    { id: 'appointments', name: 'Rendez-vous', icon: Calendar, path: '/backoffice/appointments' },
+    { id: 'settings', name: 'Paramètres', icon: Settings, path: '/backoffice/parametre' },
     { id: 'messages', name: 'Messagerie', icon: Mail, path: '/backoffice/messages' },
-    { id: 'clients', name: 'Clients', icon: Users, path: '/backoffice' },
+    { id: 'clients', name: 'Clients', icon: Users, path: '/backoffice/clients' },
     { id: 'team', name: 'Équipe', icon: Award, path: '/backoffice' },
     { id: 'finance', name: 'Finance', icon: DollarSign, path: '/backoffice' },
     { id: 'analytics', name: 'Analytics', icon: BarChart3, path: '/backoffice' },
@@ -796,10 +1544,19 @@ const BackofficeDigital = () => {
     const p = location.pathname;
     if (p.includes('/backoffice/services')) setActiveMenu('projects');
     else if (p.includes('/backoffice/devis')) setActiveMenu('devis');
-    else if (p.includes('/backoffice/categories')) setActiveMenu('settings');
+    else if (p.includes('/backoffice/appointments')) setActiveMenu('appointments');
+    else if (p.includes('/backoffice/parametre')) setActiveMenu('settings');
     else if (p.includes('/backoffice/messages')) setActiveMenu('messages');
+    else if (p.includes('/backoffice/clients')) setActiveMenu('clients');
     else setActiveMenu('dashboard');
   }, [location.pathname]);
+
+  // Lorsque l'on arrive sur "/backoffice/parametre", ouvrir directement l'onglet "Paramètres Système"
+  useEffect(() => {
+    if (activeMenu === 'settings' && activeTab !== 'Paramètres Système') {
+      setActiveTab('Paramètres Système');
+    }
+  }, [activeMenu]);
 
   const getStatusColor = (statut) => {
     const colors = {
@@ -811,6 +1568,7 @@ const BackofficeDigital = () => {
       'En révision': 'bg-yellow-100 text-yellow-800',
       'Planifié': 'bg-purple-100 text-purple-800',
       'Payée': 'bg-green-100 text-green-800',
+      'No client': 'bg-blue-100 text-blue-800',
       'En attente': 'bg-yellow-100 text-yellow-800',
       'En retard': 'bg-red-100 text-red-800',
     };
@@ -852,6 +1610,8 @@ const BackofficeDigital = () => {
   });
   const STANDARD_EMAIL = import.meta.env.VITE_STANDARD_EMAIL || 'support@digital.tld';
   const currentUserEmail = session.getSessionEmail();
+  const currentUserRole = session.getSessionRole && session.getSessionRole();
+  const isAdmin = String(currentUserRole || '').toLowerCase() === 'admin';
   const [groupMode, setGroupMode] = useState('none'); // none | subject | participants
 
   const normalizeSubject = (s) => (s || '').trim().replace(/^(re:|fwd:|fw:)\s*/i, '').toLowerCase();
@@ -1156,8 +1916,8 @@ const BackofficeDigital = () => {
           </div>
         </div>
       )}
-    </div>
-  );
+   </div>
+ );
 
   // État et handlers pour CRUD Projets
   const [projectSearch, setProjectSearch] = useState('');
@@ -1214,13 +1974,9 @@ const BackofficeDigital = () => {
     resetProjectForm();
   };
 
-  const handleMenuClick = (menuId) => {
-    setActiveMenu(menuId);
-    setMobileMenuOpen(false);
-    setSidebarOpen(false);
-  };
+  // Supprimé: handleMenuClick non utilisé
 
-  const StatCard = ({ title, value, change, icon: Icon, color, subtitle }) => (
+  const StatCard = ({ title, value, change, icon, color, subtitle }) => (
     <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between">
         <div className="flex-1">
@@ -1241,7 +1997,7 @@ const BackofficeDigital = () => {
           )}
         </div>
         <div className={`${color} p-3 rounded-xl`}>
-          <Icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+          {React.createElement(icon, { className: 'w-5 h-5 md:w-6 md:h-6 text-white' })}
         </div>
       </div>
     </div>
@@ -1479,6 +2235,8 @@ const BackofficeDigital = () => {
               onChange={(e) => setProjectStatusFilter(e.target.value)}
             >
               <option value="">Statut: Tous</option>
+              <option value="Actif">Actif</option>
+              <option value="Inactif">Inactif</option>
               <option value="Planifié">Planifié</option>
               <option value="En cours">En cours</option>
               <option value="En révision">En révision</option>
@@ -1668,8 +2426,28 @@ const BackofficeDigital = () => {
     </div>
   );
 
+  const openModalClient = (e, c) => {
+    e.preventDefault();
+    setSelectedClient(c || null);
+    setIsOpenClient(true);
+  }
+
+  const openQuoteForClient = () => {
+    if (!selectedClient) return;
+    setSelectedDevisRequest({
+      id: null,
+      full_name: selectedClient.nom || selectedClient.contact || '',
+      email: selectedClient.email || '',
+      phone: selectedClient.telephone || '',
+      project_type: '',
+      project_description: '',
+      attachment_url: null,
+      status: 'reçu',
+    });
+    setShowQuoteModal(true);
+  };
   const renderClients = () => (
-    <div className="space-y-4 md:space-y-6">
+    <div className=" relative z-100 overflow-hidden space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -1679,10 +2457,6 @@ const BackofficeDigital = () => {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
           />
         </div>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 text-sm">
-          <Plus className="w-5 h-5" />
-          <span>Nouveau client</span>
-        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1690,8 +2464,8 @@ const BackofficeDigital = () => {
           <div key={client.id} className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-start space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg">
-                  {client.nom.charAt(0)}
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold overflow-hidden text-lg">
+                  <img src={client.avatar} className='w-full' alt={client.nom} />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{client.nom}</h3>
@@ -1729,7 +2503,9 @@ const BackofficeDigital = () => {
               </div>
 
               <div className="flex space-x-2 pt-3 border-t border-gray-100">
-                <button className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100">
+                <button 
+                onClick={(e) => openModalClient(e, client)}
+                className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100">
                   Voir profil
                 </button>
                 <button className="flex-1 px-3 py-2 bg-gray-50 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-100">
@@ -1740,6 +2516,193 @@ const BackofficeDigital = () => {
           </div>
         ))}
       </div>
+
+{isOpenClient && selectedClient && (
+  <div className="fixed top-0 right-0 h-full w-full bg-black/50 z-50">
+
+    <div className="absolute top-0 right-0 h-full w-96 bg-white rounded-l-xl shadow-lg flex flex-col animate-slide-left">
+      
+      {/* HEADER */}
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+        <button
+          onClick={() => { setIsOpenClient(false); setSelectedClient(null); }}
+          className="flex items-center gap-1 text-gray-500 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <h2 className="text-lg font-semibold text-gray-900">Détails du client</h2>
+      </div>
+
+      {/* CONTENU PRINCIPAL */}
+      <div className="p-6 overflow-y-auto space-y-6">
+        
+        {/* Avatar */}
+        <div className="flex justify-center py-4">
+          <div className="w-32 h-32 rounded-full overflow-hidden shadow-sm">
+            <img
+              src={selectedClient.avatar}
+              className="w-full h-full object-cover"
+              alt={selectedClient.nom}
+            />
+          </div>
+        </div>
+
+        {/* Infos */}
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs text-gray-500">Nom</p>
+            <p className="text-sm font-medium">{selectedClient.nom}</p>
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500">Contact</p>
+            <p className="text-sm">{selectedClient.contact || "—"}</p>
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500">Email</p>
+            <a
+              href={`mailto:${selectedClient.email}`}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              {selectedClient.email || "—"}
+            </a>
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500">Téléphone</p>
+            <p className="text-sm">{selectedClient.telephone || "—"}</p>
+          </div>
+
+          {/* Statut + Projets */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-500">Statut</p>
+              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                ${selectedClient.statut === "Actif" 
+                  ? "bg-green-100 text-green-700"
+                  : "bg-red-100 text-red-700"
+                }`}>
+                {selectedClient.statut}
+              </span>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500">Projets</p>
+              <p className="text-sm">{selectedClient.projets}</p>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs text-gray-500">Client depuis</p>
+            <p className="text-sm">{selectedClient.depuis || "—"}</p>
+          </div>
+
+          {/* Infos compte */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-500">Type de client</p>
+              <p className="text-sm">
+                {Number.isInteger(selectedClient.id) ? "Inscrit" : "Invité"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500">Identifiant</p>
+              <p className="text-xs break-all">{selectedClient.id}</p>
+            </div>
+          </div>
+
+          {/* Actions rapides */}
+          <div className="grid grid-cols-3 gap-3 pt-2">
+            <a
+              href={`mailto:${selectedClient.email}`}
+              className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-medium text-center hover:bg-blue-100"
+            >
+              Email
+            </a>
+            <a
+              href={selectedClient.telephone ? `tel:${selectedClient.telephone}` : "#"}
+              className="px-3 py-2 bg-green-50 text-green-600 rounded-lg text-xs font-medium text-center hover:bg-green-100"
+            >
+              Appeler
+            </a>
+            <button
+              onClick={openQuoteForClient}
+              className="px-3 py-2 bg-purple-50 text-purple-600 rounded-lg text-xs font-medium text-center hover:bg-purple-100"
+            >
+              Créer devis
+            </button>
+          </div>
+
+        </div>
+
+        {/* Demandes de devis */}
+        <div className="pt-4 border-t border-gray-100">
+          <p className="text-sm font-semibold text-gray-900 mb-2">
+            Demandes de devis
+          </p>
+
+          <div className="space-y-3 max-h-52 overflow-y-auto pr-2">
+            {(allDevisRequests || [])
+              .filter(
+                (r) =>
+                  String(r.email).trim().toLowerCase() ===
+                  String(selectedClient.email).trim().toLowerCase()
+              ).length === 0 ? (
+              <p className="text-sm text-gray-600">
+                Aucun devis trouvé pour ce client.
+              </p>
+            ) : (
+              (allDevisRequests || [])
+                .filter(
+                  (r) =>
+                    String(r.email).trim().toLowerCase() ===
+                    String(selectedClient.email).trim().toLowerCase()
+                )
+                .map((r) => (
+                  <div key={r.id} className="border border-gray-100 rounded-lg p-3 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-gray-500">#{r.id}</p>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-medium bg-gray-100 text-gray-800">
+                        {r.status || "reçu"}
+                      </span>
+                    </div>
+
+                    <p className="text-sm text-gray-900">{r.project_type}</p>
+                    <p className="text-xs text-gray-600">
+                      {r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}
+                    </p>
+
+                    {r.attachment_url && (
+                      <a
+                        href={r.attachment_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        Voir pièce jointe
+                      </a>
+                    )}
+
+                    <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500"
+                        style={{ width: `${getProgressFromStatus(r.status)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+            )}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 
@@ -1747,21 +2710,22 @@ const BackofficeDigital = () => {
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
         <h2 className="text-xl font-bold text-gray-900">Gestion de l'équipe</h2>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 text-sm">
+        <button onClick={openUsersModal} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 text-sm">
           <Plus className="w-5 h-5" />
           <span>Nouveau membre</span>
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {team.map((member) => (
+        {teamMembers.map((member) => (
           <div key={member.id} className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
             <div className="flex flex-col items-center text-center mb-4">
               <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold text-2xl mb-3">
-                {member.avatar}
+                <img src={member.avatar} className='w-full h-full rounded-full' alt={member.nom} />
               </div>
               <h3 className="text-lg font-semibold text-gray-900">{member.nom}</h3>
               <p className="text-sm text-gray-600">{member.role}</p>
+              <p className="text-sm text-gray-600">{member.poste}</p>
               <p className="text-xs text-gray-500 mt-1">{member.email}</p>
             </div>
             
@@ -1788,7 +2752,7 @@ const BackofficeDigital = () => {
                   <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
                     <Mail className="w-4 h-4" />
                   </button>
-                  <button className="p-2 text-green-600 hover:bg-green-50 rounded-lg">
+                  <button onClick={() => openTeamEdit(member)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg">
                     <Edit className="w-4 h-4" />
                   </button>
                 </div>
@@ -1797,8 +2761,204 @@ const BackofficeDigital = () => {
           </div>
         ))}
       </div>
+      {teamEditOpen && teamEditData && (
+        <div className="fixed top-0 right-0 h-full w-full bg-black/50 z-50">
+          <div className="absolute top-0 right-0 h-full w-96 bg-white rounded-l-xl shadow-lg flex flex-col animate-slide-left">
+            {/* HEADER */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+              <button
+                onClick={closeTeamEdit}
+                className="flex items-center gap-1 text-gray-500 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <h2 className="text-lg font-semibold text-gray-900">Éditer le membre</h2>
+            </div>
+
+            {/* CONTENU */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs text-gray-500">Nom</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  value={teamEditData.nom || ''}
+                  onChange={(e) => handleTeamEditChange('nom', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-gray-500">Poste</label>
+                <input
+                  type="text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  value={teamEditData.poste || ''}
+                  onChange={(e) => handleTeamEditChange('poste', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-gray-500">Rôle</label>
+                <select
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  value={teamEditData.role || ''}
+                  onChange={(e) => handleTeamEditChange('role', e.target.value)}
+                >
+                  <option value="Administrateur">Administrateur</option>
+                  <option value="Manager">Manager</option>
+                  <option value="User">Utilisateur</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-gray-500">Email</label>
+                <input
+                  type="email"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  value={teamEditData.email || ''}
+                  onChange={(e) => handleTeamEditChange('email', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-gray-500">Disponibilité (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  value={teamEditData.disponibilite ?? 0}
+                  onChange={(e) => handleTeamEditChange('disponibilite', Number(e.target.value))}
+                />
+              </div>
+            </div>
+
+            {/* FOOTER */}
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
+              <button onClick={closeTeamEdit} className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm">Annuler</button>
+              <button onClick={saveTeamEdit} className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {usersModalOpen && (
+        <div className="fixed top-0 right-0 h-full w-full bg-black/50 z-50">
+          <div className="absolute top-0 right-0 h-full w-[480px] bg-white rounded-l-xl shadow-lg flex flex-col animate-slide-left">
+            {/* HEADER */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+              <button
+                onClick={closeUsersModal}
+                className="flex items-center gap-1 text-gray-500 hover:text-gray-900 transition-colors"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <h2 className="text-lg font-semibold text-gray-900">Tous les utilisateurs</h2>
+            </div>
+
+            {/* BARRE DE RECHERCHE */}
+            <div className="px-6 pt-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  placeholder="Rechercher par nom ou email..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  value={usersQuery}
+                  onChange={(e) => setUsersQuery(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* LISTE */}
+            <div className="p-6 overflow-y-auto flex-1">
+              {usersLoading ? (
+                <p className="text-sm text-gray-600">Chargement...</p>
+              ) : usersError ? (
+                <p className="text-sm text-red-600">{usersError}</p>
+              ) : (
+                <div className="space-y-2">
+                  {usersList
+                    .filter(u => {
+                      const q = usersQuery.trim().toLowerCase();
+                      if (!q) return true;
+                      return (
+                        String(u.first_name || '').toLowerCase().includes(q) ||
+                        String(u.last_name || '').toLowerCase().includes(q) ||
+                        String(u.email || '').toLowerCase().includes(q)
+                      );
+                    })
+                    .map(u => {
+                      const name = `${u.first_name || ''} ${u.last_name || ''}`.trim() || (u.email || 'Utilisateur');
+                      const role = String(u.role || '').toLowerCase();
+                      const canEdit = role === 'user';
+                      return (
+                        <div key={u.id} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{name}</p>
+                            <p className="text-xs text-gray-600">{u.email}</p>
+                            <span className={`mt-1 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${role === 'admin' ? 'bg-purple-100 text-purple-700' : role === 'manager' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+                              {role}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => startEditUserRole(u)}
+                              disabled={!canEdit}
+                              className={`px-3 py-2 rounded-lg text-sm font-medium ${canEdit ? 'bg-green-50 text-green-700 hover:bg-green-100' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                            >
+                              Modifier rôle
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            {/* FORMULAIRE DE MODIFICATION DU RÔLE */}
+            {selectedUserForRole && (
+              <div className="px-6 pb-4 border-t border-gray-100">
+                <p className="text-sm font-semibold text-gray-900 mb-2">Modifier le rôle pour {`${selectedUserForRole.first_name || ''} ${selectedUserForRole.last_name || ''}`.trim() || selectedUserForRole.email}</p>
+                <div className="space-y-2">
+                  <label className="text-xs text-gray-500">Nouveau rôle</label>
+                  <select
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    value={selectedUserForRole.nextRole}
+                    onChange={(e) => handleChangeRoleSelection(e.target.value)}
+                  >
+                    <option value="manager">Manager</option>
+                    <option value="admin">Administrateur</option>
+                    <option value="User">Utilisateur</option>
+                  </select>
+                </div>
+                <div className="mt-3 flex justify-end gap-2">
+                  <button onClick={() => setSelectedUserForRole(null)} className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm">Annuler</button>
+                  <button onClick={saveUserRoleUpdate} disabled={roleUpdateSaving} className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">
+                    {roleUpdateSaving ? 'Enregistrement...' : 'Enregistrer'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
+
+  const renderTeamSecured = () => {
+    if (!isAdmin) {
+      return (
+        <div className="flex items-center justify-center h-full p-8">
+          <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+            <div className="mx-auto mb-3 w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center">
+              <Lock className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Accès refusé</h3>
+            <p className="mt-1 text-sm text-gray-600">Cette section est réservée aux administrateurs.</p>
+          </div>
+        </div>
+      );
+    }
+    return renderTeam();
+  };
 
   const renderFinance = () => (
     <div className="space-y-4 md:space-y-6">
@@ -2132,125 +3292,637 @@ const BackofficeDigital = () => {
     <div className="space-y-4 md:space-y-6">
       <h2 className="text-xl font-bold text-gray-900">Paramètres</h2>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-1 space-y-2">
-          {['Profil', 'Entreprise', 'Facturation', 'Notifications', 'Sécurité', 'Intégrations'].map((item) => (
-            <button key={item} className="w-full text-left px-4 py-3 bg-white rounded-lg hover:bg-gray-50 text-sm font-medium text-gray-700">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="lg:col-span space-y-2">
+          {['Profil', 'Catégorie', 'Service', 'Blog', 'Portfolio', 'Promo', 'Paramètres Système'].map((item) => (
+            <button
+              key={item}
+              onClick={() => setActiveTab(item)}
+              className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium 
+                ${activeTab === item ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+            >
               {item}
             </button>
           ))}
+
         </div>
 
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6">
-
-          {/* Catégories de services */}
-          <div className="mt-10">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Catégories de services</h3>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={categorySearch}
-                  onChange={(e) => setCategorySearch(e.target.value)}
-                  placeholder="Rechercher une catégorie"
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                />
-                <button onClick={openNewCategory} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-blue-700">
-                  <Plus className="w-4 h-4" />
-                  <span>Ajouter</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="border rounded-xl overflow-hidden">
-              <div className="bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-500 grid grid-cols-12">
-                <div className="col-span-5">Nom</div>
-                <div className="col-span-4">Icône (texte)</div>
-                <div className="col-span-3 text-right">Actions</div>
+        <div className="lg:col-span-3 bg-white rounded-xl shadow-sm p-6">
+          {activeTab === "Profil" && (
+            <div className="text-gray-700 text-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Gestion du Profil (AboutDigital)</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={openCreateProfile} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">Nouveau</button>
+                  <button onClick={loadProfiles} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs">Recharger</button>
+                </div>
               </div>
 
-              {loadingCategories ? (
-                <div className="p-4 text-sm text-gray-600">Chargement des catégories…</div>
-              ) : (
-                <div>
-                  {(serviceCategories || [])
-                    .filter(c => {
-                      const q = categorySearch.trim().toLowerCase();
-                      if (!q) return true;
-                      return (c.name || '').toLowerCase().includes(q) || (c.icon || '').toLowerCase().includes(q);
-                    })
-                    .map((c) => (
-                      <div key={c.id} className="px-4 py-3 border-t grid grid-cols-12 items-center">
-                        <div className="col-span-5 text-sm font-medium text-gray-900">{c.name}</div>
-                        <div className="col-span-4 text-sm text-gray-600">{c.icon || '-'}</div>
-                        <div className="col-span-3 flex justify-end gap-2">
-                          <button onClick={() => openEditCategory(c)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => deleteCategory(c.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  {(!serviceCategories || serviceCategories.length === 0) && (
-                    <div className="p-4 text-sm text-gray-600">Aucune catégorie pour le moment.</div>
-                  )}
+              {profilesError && <div className="text-red-600">{profilesError}</div>}
+
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50">
+                      <th className="p-3 text-left">Titre</th>
+                      <th className="p-3 text-left">Actif</th>
+                      <th className="p-3 text-left">Maj</th>
+                      <th className="p-3 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(profiles) && profiles.length > 0 ? profiles.map(p => (
+                      <tr key={p.id} className="border-t">
+                        <td className="p-3">{p.title || '-'}</td>
+                        <td className="p-3">{p.is_active ? 'Oui' : 'Non'}</td>
+                        <td className="p-3">{p.updated_at || '-'}</td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => openEditProfile(p)} className="px-2 py-1 bg-blue-50 hover:bg-blue-100 rounded">Éditer</button>
+                            <button onClick={() => deleteProfile(p.id)} className="px-2 py-1 bg-red-50 hover:bg-red-100 rounded">Supprimer</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr><td className="p-3 text-gray-500" colSpan={4}>{profilesLoading ? 'Chargement...' : 'Aucun profil trouvé'}</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {profileFormOpen && (
+                <div className="border rounded-lg p-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600">Titre</label>
+                      <input value={profileFormData.title} onChange={e=>setProfileFormData({...profileFormData, title: e.target.value})} className="w-full border rounded px-3 py-2" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600">Sous-titre</label>
+                      <input value={profileFormData.subtitle} onChange={e=>setProfileFormData({...profileFormData, subtitle: e.target.value})} className="w-full border rounded px-3 py-2" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs text-gray-600">Bannière URL</label>
+                      <input value={profileFormData.banner_url} onChange={e=>setProfileFormData({...profileFormData, banner_url: e.target.value})} className="w-full border rounded px-3 py-2" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600">Stats JSON</label>
+                      <textarea rows={4} value={profileFormData.stats_json_raw} onChange={e=>setProfileFormData({...profileFormData, stats_json_raw: e.target.value})} className="w-full border rounded px-3 py-2 font-mono text-xs" />
+                      {!isValidJson(profileFormData.stats_json_raw) && <div className="text-red-600 text-xs mt-1">JSON invalide</div>}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600">Services JSON</label>
+                      <textarea rows={4} value={profileFormData.services_json_raw} onChange={e=>setProfileFormData({...profileFormData, services_json_raw: e.target.value})} className="w-full border rounded px-3 py-2 font-mono text-xs" />
+                      {!isValidJson(profileFormData.services_json_raw) && <div className="text-red-600 text-xs mt-1">JSON invalide</div>}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600">Valeurs JSON</label>
+                      <textarea rows={4} value={profileFormData.values_json_raw} onChange={e=>setProfileFormData({...profileFormData, values_json_raw: e.target.value})} className="w-full border rounded px-3 py-2 font-mono text-xs" />
+                      {!isValidJson(profileFormData.values_json_raw) && <div className="text-red-600 text-xs mt-1">JSON invalide</div>}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600">Équipe JSON</label>
+                      <textarea rows={4} value={profileFormData.team_json_raw} onChange={e=>setProfileFormData({...profileFormData, team_json_raw: e.target.value})} className="w-full border rounded px-3 py-2 font-mono text-xs" />
+                      {!isValidJson(profileFormData.team_json_raw) && <div className="text-red-600 text-xs mt-1">JSON invalide</div>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs text-gray-600">Actif</label>
+                    <input type="checkbox" checked={!!profileFormData.is_active} onChange={e=>setProfileFormData({...profileFormData, is_active: e.target.checked ? 1 : 0})} />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button disabled={profileSaving} onClick={saveProfile} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">{profileSaving ? 'Enregistrement...' : 'Enregistrer'}</button>
+                    <button onClick={()=>setProfileFormOpen(false)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs">Annuler</button>
+                  </div>
                 </div>
               )}
             </div>
+          )}
+          {activeTab === "Promo" && (
+            <div className="text-gray-700 text-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Gestion de la Promo (page Pricing)</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={openCreatePromo} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">Nouvelle promo</button>
+                  <button onClick={loadPromos} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs">Recharger</button>
+                </div>
+              </div>
 
-            {categoryFormOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center">
-                <div className="absolute inset-0 bg-black/40" onClick={() => setCategoryFormOpen(false)} />
-                <div className="relative bg-white rounded-xl shadow-xl p-6 w-[92%] max-w-md">
-                  <h4 className="text-lg font-semibold mb-4">{categoryFormData.id ? 'Modifier la catégorie' : 'Ajouter une catégorie'}</h4>
-                  {categoryError && (
-                    <div className="mb-3 text-sm text-red-600">{categoryError}</div>
+              {promoError && <div className="text-red-600">{promoError}</div>}
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50">
+                      <th className="p-3 text-left">Titre</th>
+                      <th className="p-3 text-left">Cycle</th>
+                      <th className="p-3 text-left">Active</th>
+                      <th className="p-3 text-left">Maj</th>
+                      <th className="p-3 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(promos) && promos.length > 0 ? promos.map(p => (
+                      <tr key={p.id} className="border-t">
+                        <td className="p-3">{p.title || '-'}</td>
+                        <td className="p-3">{p.billing_cycle_default}</td>
+                        <td className="p-3">{p.is_active ? 'Oui' : 'Non'}</td>
+                        <td className="p-3">{p.updated_at ? new Date(p.updated_at).toLocaleString() : '-'}</td>
+                        <td className="p-3 flex items-center gap-2">
+                          <button onClick={() => openEditPromo(p)} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Éditer</button>
+                          <button onClick={() => deletePromo(p.id)} className="px-2 py-1 bg-red-600 text-white rounded">Supprimer</button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td className="p-3 text-center text-gray-500" colSpan={5}>{promoLoading ? 'Chargement...' : 'Aucune promo'}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {promoFormOpen && (
+                <div className="bg-slate-50 border rounded-xl p-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Titre</label>
+                      <input value={promoFormData.title} onChange={e=>setPromoFormData({...promoFormData, title: e.target.value})} className="w-full p-2 border rounded" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Cycle de facturation par défaut</label>
+                      <select value={promoFormData.billing_cycle_default} onChange={e=>setPromoFormData({...promoFormData, billing_cycle_default: e.target.value})} className="w-full p-2 border rounded">
+                        <option value="monthly">Mensuel</option>
+                        <option value="annual">Annuel</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Image URL</label>
+                      <input value={promoFormData.img_url} onChange={e=>setPromoFormData({...promoFormData, img_url: e.target.value})} className="w-full p-2 border rounded" placeholder="https://exemple.com/image.jpg" />
+                      {promoFormData.img_url && (
+                        <div className="mt-2">
+                          <img src={promoFormData.img_url} alt="Aperçu" className="h-24 rounded object-cover border" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Sous-titre</label>
+                      <textarea value={promoFormData.subtitle} onChange={e=>setPromoFormData({...promoFormData, subtitle: e.target.value})} className="w-full p-2 border rounded" rows={2} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Fin d'offre (datetime)</label>
+                      <input type="datetime-local" value={promoFormData.timer_end_at} onChange={e=>setPromoFormData({...promoFormData, timer_end_at: e.target.value})} className="w-full p-2 border rounded" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Active</label>
+                      <select value={promoFormData.is_active} onChange={e=>setPromoFormData({...promoFormData, is_active: e.target.value})} className="w-full p-2 border rounded">
+                        <option value={1}>Oui</option>
+                        <option value={0}>Non</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Plans (JSON)</label>
+                    <textarea
+                      value={promoJsonRaw.plans_json}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setPromoJsonRaw({ ...promoJsonRaw, plans_json: val });
+                        if (isValidJsonArray(val)) {
+                          setPromoJsonErrors({ ...promoJsonErrors, plans_json: null });
+                          setPromoFormData({ ...promoFormData, plans_json: JSON.parse(val) });
+                        } else {
+                          setPromoJsonErrors({ ...promoJsonErrors, plans_json: 'JSON invalide (doit être un tableau)' });
+                        }
+                      }}
+                      className={`w-full p-2 border rounded font-mono text-xs ${promoJsonErrors.plans_json ? 'border-red-400' : ''}`}
+                      rows={8}
+                    />
+                    {promoJsonErrors.plans_json && (
+                      <div className="mt-1 text-xs text-red-600">{promoJsonErrors.plans_json}</div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Comparaison (JSON)</label>
+                    <textarea
+                      value={promoJsonRaw.comparison_json}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setPromoJsonRaw({ ...promoJsonRaw, comparison_json: val });
+                        if (isValidJsonArray(val)) {
+                          setPromoJsonErrors({ ...promoJsonErrors, comparison_json: null });
+                          setPromoFormData({ ...promoFormData, comparison_json: JSON.parse(val) });
+                        } else {
+                          setPromoJsonErrors({ ...promoJsonErrors, comparison_json: 'JSON invalide (doit être un tableau)' });
+                        }
+                      }}
+                      className={`w-full p-2 border rounded font-mono text-xs ${promoJsonErrors.comparison_json ? 'border-red-400' : ''}`}
+                      rows={6}
+                    />
+                    {promoJsonErrors.comparison_json && (
+                      <div className="mt-1 text-xs text-red-600">{promoJsonErrors.comparison_json}</div>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Features Entreprise (JSON)</label>
+                    <textarea
+                      value={promoJsonRaw.enterprise_features_json}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setPromoJsonRaw({ ...promoJsonRaw, enterprise_features_json: val });
+                        if (isValidJsonArray(val)) {
+                          setPromoJsonErrors({ ...promoJsonErrors, enterprise_features_json: null });
+                          setPromoFormData({ ...promoFormData, enterprise_features_json: JSON.parse(val) });
+                        } else {
+                          setPromoJsonErrors({ ...promoJsonErrors, enterprise_features_json: 'JSON invalide (doit être un tableau)' });
+                        }
+                      }}
+                      className={`w-full p-2 border rounded font-mono text-xs ${promoJsonErrors.enterprise_features_json ? 'border-red-400' : ''}`}
+                      rows={6}
+                    />
+                    {promoJsonErrors.enterprise_features_json && (
+                      <div className="mt-1 text-xs text-red-600">{promoJsonErrors.enterprise_features_json}</div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button onClick={savePromo} className="px-4 py-2 bg-blue-600 text-white rounded">Enregistrer</button>
+                    <button onClick={()=>setPromoFormOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded">Annuler</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'Blog' && (
+            <div className="text-gray-700 text-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Gestion des articles du blog</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={openCreateBlog} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">Nouvel article</button>
+                  <button onClick={loadBlogs} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs">Recharger</button>
+                </div>
+              </div>
+
+              {blogsError && <div className="text-red-600">{blogsError}</div>}
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50">
+                      <th className="p-3 text-left">Titre</th>
+                      <th className="p-3 text-left">Catégorie</th>
+                      <th className="p-3 text-left">Publié</th>
+                      <th className="p-3 text-left">Vues</th>
+                      <th className="p-3 text-left">Maj</th>
+                      <th className="p-3 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(blogs) && blogs.length > 0 ? blogs.map(b => (
+                      <tr key={b.id} className="border-t">
+                        <td className="p-3">{b.title}</td>
+                        <td className="p-3">{(serviceCategories || []).find(c => c.id === b.category_id)?.name || b.category_id}</td>
+                        <td className="p-3">{b.published_date || '-'}</td>
+                        <td className="p-3">{typeof b.views === 'number' ? b.views : (b.views ? Number(b.views) || 0 : 0)}</td>
+                        <td className="p-3">{b.updated_at ? new Date(b.updated_at).toLocaleString() : '-'}</td>
+                        <td className="p-3 flex items-center gap-2">
+                          <button onClick={() => openEditBlog(b)} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Éditer</button>
+                          <button onClick={() => deleteBlog(b.id)} className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded">Supprimer</button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td className="p-3" colSpan={6}>{blogsLoading ? 'Chargement...' : 'Aucun article'}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {blogFormOpen && (
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                  <div className="bg-white rounded-xl shadow-lg w-full max-w-6xl h-full max-h-4xl p-6 space-y-4 overflow-y-auto">
+                    <h4 className="text-lg font-semibold">{blogFormData.id ? 'Éditer l\'article' : 'Nouvel article'}</h4>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs text-gray-600">Catégorie</label>
+                        <select value={blogFormData.category_id ?? ''} onChange={(e)=>setBlogFormData(d=>({...d, category_id: e.target.value }))} className="w-full px-3 py-2 border rounded-lg">
+                          {(serviceCategories || []).map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Titre</label>
+                        <input value={blogFormData.title} onChange={(e)=>setBlogFormData(d=>({...d, title: e.target.value }))} className="w-full px-3 py-2 border rounded-lg" />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-xs text-gray-600">Extrait</label>
+                        <textarea value={blogFormData.excerpt} onChange={(e)=>setBlogFormData(d=>({...d, excerpt: e.target.value }))} className="w-full px-3 py-2 border rounded-lg" rows={3} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-xs text-gray-600">Contenu</label>
+                        <textarea value={blogFormData.content} onChange={(e)=>setBlogFormData(d=>({...d, content: e.target.value }))} className="w-full px-3 py-2 border rounded-lg" rows={6} />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Image URL</label>
+                        <input value={blogFormData.image_url} onChange={(e)=>setBlogFormData(d=>({...d, image_url: e.target.value }))} className="w-full px-3 py-2 border rounded-lg" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Date de publication</label>
+                        <input type="date" value={blogFormData.published_date} onChange={(e)=>setBlogFormData(d=>({...d, published_date: e.target.value }))} className="w-full px-3 py-2 border rounded-lg" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Durée de lecture</label>
+                        <input value={blogFormData.read_time} onChange={(e)=>setBlogFormData(d=>({...d, read_time: e.target.value }))} className="w-full px-3 py-2 border rounded-lg" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Tags (séparés par des virgules)</label>
+                        <input value={blogFormData.tags_raw} onChange={(e)=>setBlogFormData(d=>({...d, tags_raw: e.target.value }))} className="w-full px-3 py-2 border rounded-lg" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Auteur</label>
+                        <input value={blogFormData.author_name} onChange={(e)=>setBlogFormData(d=>({...d, author_name: e.target.value }))} className="w-full px-3 py-2 border rounded-lg" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Rôle de l'auteur</label>
+                        <input value={blogFormData.author_role} onChange={(e)=>setBlogFormData(d=>({...d, author_role: e.target.value }))} className="w-full px-3 py-2 border rounded-lg" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-600">Avatar de l'auteur (URL)</label>
+                        <input value={blogFormData.author_avatar} onChange={(e)=>setBlogFormData(d=>({...d, author_avatar: e.target.value }))} className="w-full px-3 py-2 border rounded-lg" />
+                      </div>
+                      <div className="flex items-center gap-4 md:col-span-2">
+                        <label className="flex items-center gap-2 text-sm">
+                          <input type="checkbox" checked={!!blogFormData.featured} onChange={(e)=>setBlogFormData(d=>({...d, featured: e.target.checked ? 1 : 0 }))} />
+                          <span>Mis en avant</span>
+                        </label>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input type="checkbox" checked={!!blogFormData.trending} onChange={(e)=>setBlogFormData(d=>({...d, trending: e.target.checked ? 1 : 0 }))} />
+                          <span>Tendance</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <button onClick={() => setBlogFormOpen(false)} className="px-4 py-2 border rounded-lg">Annuler</button>
+                      <button onClick={saveBlog} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Enregistrer</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'Portfolio' && (
+            <div className="text-gray-700 text-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Gestion du Portfolio (Projets)</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => {
+                    setPortfolioFormData({ id: null, title: '', category: '', client: '', year: '', description: '', image_url: '', tags_raw: '' });
+                    setPortfolioFormOpen(true);
+                  }} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">Nouveau projet</button>
+                  <button onClick={loadPortfolioProjects} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs">Recharger</button>
+                </div>
+              </div>
+
+              {portfolioError && <div className="text-red-600">{portfolioError}</div>}
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50">
+                      <th className="p-3 text-left">Titre</th>
+                      <th className="p-3 text-left">Catégorie</th>
+                      <th className="p-3 text-left">Client</th>
+                      <th className="p-3 text-left">Année</th>
+                      <th className="p-3 text-left">Maj</th>
+                      <th className="p-3 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(portfolioProjects) && portfolioProjects.length > 0 ? portfolioProjects.map(p => (
+                      <tr key={p.id} className="border-t">
+                        <td className="p-3">{p.title || '-'}</td>
+                        <td className="p-3">{p.category || '-'}</td>
+                        <td className="p-3">{p.client || '-'}</td>
+                        <td className="p-3">{p.year || '-'}</td>
+                        <td className="p-3">{p.updated_at ? new Date(p.updated_at).toLocaleString() : '-'}</td>
+                        <td className="p-3 flex items-center gap-2">
+                          <button onClick={() => {
+                            setPortfolioFormData({
+                              id: p.id,
+                              title: p.title || '',
+                              category: p.category || '',
+                              client: p.client || '',
+                              year: p.year || '',
+                              description: p.description || '',
+                              image_url: p.image_url || p.image || '',
+                              tags_raw: Array.isArray(p.tags) ? p.tags.join(',') : (typeof p.tags === 'string' ? p.tags : ''),
+                            });
+                            setPortfolioFormOpen(true);
+                          }} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Éditer</button>
+                          <button onClick={async () => {
+                            if (!confirm('Supprimer ce projet ?')) return;
+                            try { await projectsApi.remove(p.id); await loadPortfolioProjects(); } catch (e) { alert(e?.message || 'Erreur suppression projet'); }
+                          }} className="px-2 py-1 bg-red-600 text-white rounded">Supprimer</button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td className="p-3 text-center text-gray-500" colSpan={6}>{portfolioLoading ? 'Chargement...' : 'Aucun projet'}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {portfolioFormOpen && (
+                <div className="bg-slate-50 border rounded-xl p-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Titre</label>
+                      <input value={portfolioFormData.title} onChange={e=>setPortfolioFormData({...portfolioFormData, title: e.target.value})} className="w-full p-2 border rounded" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Catégorie</label>
+                      <input value={portfolioFormData.category} onChange={e=>setPortfolioFormData({...portfolioFormData, category: e.target.value})} className="w-full p-2 border rounded" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Client</label>
+                      <input value={portfolioFormData.client} onChange={e=>setPortfolioFormData({...portfolioFormData, client: e.target.value})} className="w-full p-2 border rounded" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Année</label>
+                      <input value={portfolioFormData.year} onChange={e=>setPortfolioFormData({...portfolioFormData, year: e.target.value})} className="w-full p-2 border rounded" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Description</label>
+                      <textarea value={portfolioFormData.description} onChange={e=>setPortfolioFormData({...portfolioFormData, description: e.target.value})} className="w-full p-2 border rounded" rows={3} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Image URL</label>
+                      <input value={portfolioFormData.image_url} onChange={e=>setPortfolioFormData({...portfolioFormData, image_url: e.target.value})} className="w-full p-2 border rounded" placeholder="https://exemple.com/image.jpg" />
+                      {portfolioFormData.image_url && (
+                        <div className="mt-2">
+                          <img src={portfolioFormData.image_url} alt="Aperçu" className="h-24 rounded object-cover border" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Tags (séparés par des virgules)</label>
+                      <input value={portfolioFormData.tags_raw} onChange={e=>setPortfolioFormData({...portfolioFormData, tags_raw: e.target.value})} className="w-full p-2 border rounded" placeholder="React, Node, UI" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={async () => {
+                      try {
+                        if (!portfolioFormData.title?.trim()) throw new Error('Le titre est obligatoire');
+                        if (!portfolioFormData.category?.trim()) throw new Error('La catégorie est obligatoire');
+                        const payload = {
+                          title: portfolioFormData.title.trim(),
+                          category: portfolioFormData.category.trim(),
+                          client: portfolioFormData.client ?? '',
+                          year: portfolioFormData.year ?? '',
+                          description: portfolioFormData.description ?? '',
+                          image_url: portfolioFormData.image_url ?? '',
+                          tags: (portfolioFormData.tags_raw || '').split(',').map(t=>t.trim()).filter(Boolean),
+                        };
+                        if (portfolioFormData.id) {
+                          await projectsApi.update(portfolioFormData.id, payload);
+                        } else {
+                          await projectsApi.create(payload);
+                        }
+                        setPortfolioFormOpen(false);
+                        await loadPortfolioProjects();
+                        alert('Projet enregistré');
+                      } catch (e) {
+                        alert(e?.message || 'Erreur enregistrement projet');
+                      }
+                    }} className="px-4 py-2 bg-blue-600 text-white rounded">Enregistrer</button>
+                    <button onClick={()=>setPortfolioFormOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded">Annuler</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {activeTab === "Catégorie" && (
+            <div className="text-gray-700 text-sm">
+                {/* Catégories de services */}
+                <div className="mt-10">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold">Catégories de services</h3>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={categorySearch}
+                        onChange={(e) => setCategorySearch(e.target.value)}
+                        placeholder="Rechercher une catégorie"
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                      <button onClick={openNewCategory} className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-blue-700">
+                        <Plus className="w-4 h-4" />
+                        <span>Ajouter</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border rounded-xl overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-500 grid grid-cols-12">
+                      <div className="col-span-5">Nom</div>
+                      <div className="col-span-4">Icône (texte)</div>
+                      <div className="col-span-3 text-right">Actions</div>
+                    </div>
+
+                    {loadingCategories ? (
+                      <div className="p-4 text-sm text-gray-600">Chargement des catégories…</div>
+                    ) : (
+                      <div>
+                        {(serviceCategories || [])
+                          .filter(c => {
+                            const q = categorySearch.trim().toLowerCase();
+                            if (!q) return true;
+                            return (c.name || '').toLowerCase().includes(q) || (c.icon || '').toLowerCase().includes(q);
+                          })
+                          .map((c) => (
+                            <div key={c.id} className="px-4 py-3 border-t grid grid-cols-12 items-center">
+                              <div className="col-span-5 text-sm font-medium text-gray-900">{c.name}</div>
+                              <div className="col-span-4 text-sm text-gray-600">{c.icon || '-'}</div>
+                              <div className="col-span-3 flex justify-end gap-2">
+                                <button onClick={() => openEditCategory(c)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => deleteCategory(c.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        {(!serviceCategories || serviceCategories.length === 0) && (
+                          <div className="p-4 text-sm text-gray-600">Aucune catégorie pour le moment.</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {categoryFormOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center">
+                      <div className="absolute inset-0 bg-black/40" onClick={() => setCategoryFormOpen(false)} />
+                      <div className="relative bg-white rounded-xl shadow-xl p-6 w-[92%] max-w-md">
+                        <h4 className="text-lg font-semibold mb-4">{categoryFormData.id ? 'Modifier la catégorie' : 'Ajouter une catégorie'}</h4>
+                        {categoryError && (
+                          <div className="mb-3 text-sm text-red-600">{categoryError}</div>
+                        )}
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                            <input
+                              type="text"
+                              value={categoryFormData.name}
+                              onChange={(e) => setCategoryFormData(d => ({ ...d, name: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                              placeholder="Ex: Développement Web"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Icône (nom du composant)</label>
+                            <input
+                              type="text"
+                              value={categoryFormData.icon}
+                              onChange={(e) => setCategoryFormData(d => ({ ...d, icon: e.target.value }))}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                              placeholder="Ex: FileText"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">Saisis le nom de l'icône Lucide (ex: FileText, Mail, Camera).</p>
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-6">
+                          <button onClick={() => setCategoryFormOpen(false)} className="px-4 py-2 border rounded-lg">Annuler</button>
+                          <button onClick={saveCategory} disabled={categorySaving} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            {categorySaving ? 'Enregistrement…' : 'Enregistrer'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   )}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
-                      <input
-                        type="text"
-                        value={categoryFormData.name}
-                        onChange={(e) => setCategoryFormData(d => ({ ...d, name: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        placeholder="Ex: Développement Web"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Icône (nom du composant)</label>
-                      <input
-                        type="text"
-                        value={categoryFormData.icon}
-                        onChange={(e) => setCategoryFormData(d => ({ ...d, icon: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                        placeholder="Ex: FileText"
-                      />
-                      <p className="mt-1 text-xs text-gray-500">Saisis le nom de l'icône Lucide (ex: FileText, Mail, Camera).</p>
-                    </div>
-                  </div>
-                  <div className="flex justify-end gap-2 mt-6">
-                    <button onClick={() => setCategoryFormOpen(false)} className="px-4 py-2 border rounded-lg">Annuler</button>
-                    <button onClick={saveCategory} disabled={categorySaving} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                      {categorySaving ? 'Enregistrement…' : 'Enregistrer'}
-                    </button>
-                  </div>
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Services */}
-          <div className="mt-10">
-            <div className="flex  items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Services</h3>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={serviceSearch}
-                  onChange={(e) => setServiceSearch(e.target.value)}
+          {activeTab === "Service" && (
+            <div className="text-gray-700 text-sm">
+              {/* Services */}
+              <div className="mt-10">
+                <div className="flex  items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Services</h3>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={serviceSearch}
+                      onChange={(e) => setServiceSearch(e.target.value)}
                   placeholder="Rechercher un service"
                   className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
                 />
@@ -2773,8 +4445,96 @@ const BackofficeDigital = () => {
                 </div>
               </div>
             )}
-          </div>
+              </div>
+            </div>
+          )}
 
+          {activeTab === 'Paramètres Système' && (
+            <div className="text-gray-700 text-sm space-y-6">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Paramètres système (app_settings)</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={openCreateAppSetting} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">Nouveau paramètre</button>
+                  <button onClick={loadAppSettings} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs">Recharger</button>
+                </div>
+              </div>
+
+              {appSettingsError && <div className="text-red-600">{appSettingsError}</div>}
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50">
+                      <th className="p-3 text-left">Clé</th>
+                      <th className="p-3 text-left">Type</th>
+                      <th className="p-3 text-left">Description</th>
+                      <th className="p-3 text-left">Maj</th>
+                      <th className="p-3 text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.isArray(appSettings) && appSettings.length > 0 ? appSettings.map(s => (
+                      <tr key={s.id} className="border-t">
+                        <td className="p-3 font-mono">{s.setting_key}</td>
+                        <td className="p-3">{s.setting_type}</td>
+                        <td className="p-3">{s.description || '-'}</td>
+                        <td className="p-3">{s.updated_at ? new Date(s.updated_at).toLocaleString() : '-'}</td>
+                        <td className="p-3 flex items-center gap-2">
+                          <button onClick={() => openEditAppSetting(s)} className="px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded">Éditer</button>
+                          <button onClick={() => deleteAppSetting(s.id)} className="px-2 py-1 bg-red-600 text-white rounded">Supprimer</button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td className="p-3 text-center text-gray-500" colSpan={5}>{appSettingsLoading ? 'Chargement...' : 'Aucun paramètre'}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {appSettingFormOpen && (
+                <div className="bg-slate-50 border rounded-xl p-4 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Clé</label>
+                      <input value={appSettingFormData.setting_key} onChange={e=>setAppSettingFormData({...appSettingFormData, setting_key: e.target.value})} className="w-full p-2 border rounded font-mono" placeholder="EXEMPLE_CLE" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Type</label>
+                      <select value={appSettingFormData.setting_type} onChange={e=>setAppSettingFormData({...appSettingFormData, setting_type: e.target.value})} className="w-full p-2 border rounded">
+                        <option value="string">string</option>
+                        <option value="number">number</option>
+                        <option value="boolean">boolean</option>
+                        <option value="json">json</option>
+                        <option value="date">date</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Description</label>
+                      <textarea value={appSettingFormData.description} onChange={e=>setAppSettingFormData({...appSettingFormData, description: e.target.value})} className="w-full p-2 border rounded" rows={2} />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Valeur</label>
+                      <textarea
+                        value={appSettingFormData.setting_value_raw}
+                        onChange={e=>setAppSettingFormData({...appSettingFormData, setting_value_raw: e.target.value})}
+                        className={`w-full p-2 border rounded font-mono text-xs`}
+                        rows={8}
+                        placeholder={appSettingFormData.setting_type === 'json' ? '{\n  "key": "value"\n}' : 'texte / nombre / true|false / date ISO'}
+                      />
+                      {appSettingFormData.setting_type === 'json' && appSettingFormData.setting_value_raw.trim() && !isValidJson(appSettingFormData.setting_value_raw) && (
+                        <div className="mt-1 text-xs text-red-600">JSON invalide (doit être un objet/array valide)</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={saveAppSetting} className="px-3 py-2 bg-blue-600 text-white rounded-lg text-xs">Enregistrer</button>
+                    <button onClick={()=>setAppSettingFormOpen(false)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs">Annuler</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -2784,14 +4544,106 @@ const BackofficeDigital = () => {
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
         <h2 className="text-xl font-bold text-gray-900">Suivi des devis</h2>
-        <button onClick={loadDevis} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 text-sm">
-          <RefreshCw className="w-5 h-5" />
-          <span>Rafraîchir</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowDevisFilters(v => !v)} className="bg-gray-100 text-gray-800 px-3 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-gray-200">
+            <Filter className="w-4 h-4" />
+            <span>Filtres</span>
+          </button>
+          <button onClick={loadDevis} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 text-sm">
+            <RefreshCw className="w-5 h-5" />
+            <span>Rafraîchir</span>
+          </button>
+        </div>
       </div>
 
       {devisError && (
         <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg">{devisError}</div>
+      )}
+
+      {showDevisFilters && (
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 bg-white border border-gray-200 rounded-xl p-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Recherche</label>
+            <input
+              type="text"
+              value={devisFilters.query}
+              onChange={(e) => setDevisFilters(f => ({ ...f, query: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              placeholder="Client, email, ID…"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Statut</label>
+            <select
+              value={devisFilters.status}
+              onChange={(e) => setDevisFilters(f => ({ ...f, status: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="">Tous</option>
+              {statusOptions.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Type de projet</label>
+            <input
+              type="text"
+              value={devisFilters.project_type}
+              onChange={(e) => setDevisFilters(f => ({ ...f, project_type: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              placeholder="Ex: Site vitrine"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Date min</label>
+            <input
+              type="date"
+              value={devisFilters.date_min}
+              onChange={(e) => setDevisFilters(f => ({ ...f, date_min: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Date max</label>
+            <input
+              type="date"
+              value={devisFilters.date_max}
+              onChange={(e) => setDevisFilters(f => ({ ...f, date_max: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Montant min (€)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={devisFilters.amount_min}
+              onChange={(e) => setDevisFilters(f => ({ ...f, amount_min: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Montant max (€)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={devisFilters.amount_max}
+              onChange={(e) => setDevisFilters(f => ({ ...f, amount_max: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={() => setDevisFilters({ query: '', status: '', project_type: '', date_min: '', date_max: '', amount_min: '', amount_max: '' })}
+              className="px-3 py-2 border rounded-lg text-sm"
+            >
+              Réinitialiser
+            </button>
+          </div>
+        </div>
       )}
 
       <div className="bg-white rounded-xl shadow-sm">
@@ -2814,10 +4666,50 @@ const BackofficeDigital = () => {
                   <td className="p-4 text-center text-sm text-gray-600" colSpan={6}>Chargement...</td>
                 </tr>
               ) : Array.isArray(devisRequests) && devisRequests.length > 0 ? (
-                devisRequests.map((d, idx) => {
-                  const client = d?.client_name || d?.clientName || d?.client || d?.name || '—';
+                // Application des filtres avancés
+                devisRequests
+                  .filter((d) => {
+                    const q = (devisFilters.query || '').trim().toLowerCase();
+                    const name = String(d?.full_name || d?.client_name || '').toLowerCase();
+                    const email = String(d?.email || d?.client_email || d?.contact?.email || '').toLowerCase();
+                    const idStr = String(d?.id ?? '');
+                    const typeVal = String(d?.project_type || '').toLowerCase();
+
+                    // Recherche globale
+                    if (q && !(name.includes(q) || email.includes(q) || idStr.includes(q))) return false;
+
+                    // Statut
+                    const normalizedStatus = normalizeStatusKey(d?.status || d?.statut || '');
+                    if (devisFilters.status && normalizedStatus !== devisFilters.status) return false;
+
+                    // Type de projet
+                    const filterType = (devisFilters.project_type || '').trim().toLowerCase();
+                    if (filterType && !typeVal.includes(filterType)) return false;
+
+                    // Dates
+                    const created = d?.created_at ? new Date(d.created_at) : null;
+                    if (devisFilters.date_min && created) {
+                      const min = new Date(devisFilters.date_min + 'T00:00:00');
+                      if (created < min) return false;
+                    }
+                    if (devisFilters.date_max && created) {
+                      const max = new Date(devisFilters.date_max + 'T23:59:59');
+                      if (created > max) return false;
+                    }
+
+                    // Montant estimé (compatibles: estimated_amount, montant_estime)
+                    const amount = d?.estimated_amount ?? d?.montant_estime ?? null;
+                    const minAmount = devisFilters.amount_min !== '' ? parseFloat(devisFilters.amount_min) : null;
+                    const maxAmount = devisFilters.amount_max !== '' ? parseFloat(devisFilters.amount_max) : null;
+                    if (minAmount != null && amount != null && parseFloat(amount) < minAmount) return false;
+                    if (maxAmount != null && amount != null && parseFloat(amount) > maxAmount) return false;
+
+                    return true;
+                  })
+                  .map((d, idx) => {
+                  const client = d?.full_name|| '—';
                   const email = d?.email || d?.client_email || d?.contact?.email || '—';
-                  const type = d?.service_type || d?.type || d?.category || '—';
+                  const type = d?.project_type || '—';
                   const status = d?.status || d?.statut || '—';
                   const progress = getProgressFromStatus(status);
                   return (
@@ -2852,12 +4744,20 @@ const BackofficeDigital = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => openQuoteModal(d)}
-                          className="px-3 py-2 bg-black text-white text-xs rounded-lg hover:bg-gray-900"
-                        >
-                          Voir devis / Répondre
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openDevisDrawer(d)}
+                            className="px-3 py-2 bg-slate-100 text-gray-900 text-xs rounded-lg hover:bg-slate-200 border"
+                          >
+                            Voir détails
+                          </button>
+                          <button
+                            onClick={() => openQuoteModal(d)}
+                            className="px-3 py-2 bg-black text-white text-xs rounded-lg hover:bg-gray-900"
+                          >
+                            Répondre
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -2879,16 +4779,383 @@ const BackofficeDigital = () => {
           request={selectedDevisRequest}
         />
       )}
+
+      {showDevisDrawer && (
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/30" onClick={closeDevisDrawer} />
+          <div className="absolute right-0 top-0 h-full w-full sm:w-[420px] bg-white shadow-xl border-l border-gray-200">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-900">Demande de devis #{devisDrawerRequest?.id ?? ''}</h3>
+              <button onClick={closeDevisDrawer} className="px-2 py-1 border rounded text-sm">Fermer</button>
+            </div>
+            <div className="p-4 space-y-3 text-sm text-gray-800 overflow-y-auto h-[calc(100%-56px)]">
+              <div>
+                <div className="text-xs text-gray-500">Client</div>
+                <div className="font-medium">{devisDrawerRequest?.full_name || '-'}</div>
+                <div className="text-gray-600">{devisDrawerRequest?.email || '-'}</div>
+                {devisDrawerRequest?.phone && <div className="text-gray-600">{devisDrawerRequest.phone}</div>}
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Service</div>
+                <div>{devisDrawerRequest?.service_id ?? '-'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Type de projet</div>
+                <div>{devisDrawerRequest?.project_type || '-'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">Description du projet</div>
+                <pre className="whitespace-pre-wrap text-gray-700 bg-gray-50 border rounded p-2">{devisDrawerRequest?.project_description || '-'}</pre>
+              </div>
+              {devisDrawerRequest?.attachment_url && (
+                <div>
+                  <div className="text-xs text-gray-500">Pièce jointe</div>
+                  <a href={devisDrawerRequest.attachment_url} target="_blank" rel="noopener" className="text-blue-600 hover:underline">Voir la pièce jointe</a>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-gray-500">Statut</div>
+                  <div className="font-medium">{devisDrawerRequest?.status || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500">Créé le</div>
+                  <div>{devisDrawerRequest?.created_at ? new Date(devisDrawerRequest.created_at).toLocaleString('fr-FR') : '-'}</div>
+                </div>
+              </div>
+              <div className="pt-2 border-t">
+                <button onClick={() => openQuoteModal(devisDrawerRequest)} className="px-3 py-2 bg-black text-white rounded text-xs">Répondre</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+
+  // =============================
+  // Rendez-vous (appointments)
+  // =============================
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [appointmentsError, setAppointmentsError] = useState(null);
+  const [updatingAppointmentId, setUpdatingAppointmentId] = useState(null);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [servicesIndex, setServicesIndex] = useState({});
+  const [calendarCursor, setCalendarCursor] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    d.setHours(0,0,0,0);
+    return d;
+  });
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const loadAppointments = async () => {
+    setAppointmentsLoading(true);
+    setAppointmentsError(null);
+    try {
+      const rows = await appointmentsApi.list();
+      setAppointments(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      setAppointmentsError(e?.message || 'Erreur de chargement des rendez-vous');
+    }
+    setAppointmentsLoading(false);
+  };
+
+  const updateAppointmentStatus = async (id, nextStatus) => {
+    try {
+      setUpdatingAppointmentId(id);
+      await appointmentsApi.update(id, { status: nextStatus });
+      setAppointments(prev => prev.map(a => a.id === id ? { ...a, status: nextStatus } : a));
+      setSelectedAppointment(prev => prev && prev.id === id ? { ...prev, status: nextStatus } : prev);
+    } catch (e) {
+      alert(e?.message || 'Erreur lors de la mise à jour du statut');
+    }
+    setUpdatingAppointmentId(null);
+  };
+
+  useEffect(() => { if (activeMenu === 'appointments') loadAppointments(); }, [activeMenu]);
+  // Charger l'index des services pour afficher le titre dans le récapitulatif
+  useEffect(() => {
+    const loadServicesIndex = async () => {
+      try {
+        const rows = await servicesApi.list();
+        const idx = {};
+        (Array.isArray(rows) ? rows : []).forEach(s => { idx[s.id] = s.title || s.name || `Service ${s.id}`; });
+        setServicesIndex(idx);
+      } catch { /* silencieux */ }
+    };
+    if (activeMenu === 'appointments') loadServicesIndex();
+  }, [activeMenu]);
+
+  const renderAppointments = () => {
+    const formatChannel = (ch) => {
+      const key = String(ch || '').toLowerCase();
+      if (!key) return '—';
+      if (key.includes('chat')) return 'WhatsApp';
+      return ch;
+    };
+    return (
+  <div className="p-6 space-y-6">
+
+    {/* Titre + Actions */}
+    <div className="flex items-center justify-between">
+      <h2 className="text-2xl font-bold text-gray-900">Rendez-vous</h2>
+
+      <div className="flex items-center gap-3">
+        <button 
+          onClick={loadAppointments}
+          className="px-4 py-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700 transition"
+        >
+          Recharger
+        </button>
+
+        <span className="text-sm text-gray-600">
+          {appointmentsLoading ? "Chargement…" : `${appointments.length} trouvés`}
+        </span>
+      </div>
+    </div>
+
+    {appointmentsError && (
+      <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg shadow">
+        {appointmentsError}
+      </div>
+    )}
+
+    <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+
+      {/* ✅ LISTE MODERNE EN CARTES */}
+      <div className="xl:col-span-3 space-y-4">
+        {(selectedDay ? appointments.filter(a => {
+          const dt = a.appointment_date ? new Date(a.appointment_date) : null;
+          if (!dt || Number.isNaN(dt.getTime())) return false;
+          const key = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+          return key === selectedDay;
+        }) : appointments).map(a => {
+          const dateStr = a.appointment_date ? new Date(a.appointment_date).toLocaleString('fr-FR') : "";
+          const serviceTitle = a.service_id != null ? (servicesIndex[a.service_id] || a.service_id) : "-";
+          return (
+            <div 
+              key={a.id}
+              className="bg-white rounded-xl border shadow-sm p-4 hover:shadow-md transition cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">{a.full_name}</h3>
+                <span className="text-xs text-gray-500">{dateStr}</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 mt-3 text-sm text-gray-700">
+                <p><span className="text-gray-500">Service :</span> {serviceTitle}</p>
+                <p><span className="text-gray-500">Canal :</span> {formatChannel(a.channel)}</p>
+                <p><span className="text-gray-500">Email :</span> {a.email}</p>
+                <p><span className="text-gray-500">Téléphone :</span> {a.phone || "-"}</p>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between">
+                <select
+                  value={a.status}
+                  onChange={(e)=>updateAppointmentStatus(a.id, e.target.value)}
+                  disabled={updatingAppointmentId === a.id}
+                  className="border rounded px-2 py-1 text-sm bg-gray-50"
+                >
+                  <option value="pending">En attente</option>
+                  <option value="confirmed">Confirmé</option>
+                  <option value="cancelled">Annulé</option>
+                  <option value="completed">Terminé</option>
+                </select>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => alert(a.notes || "Pas de notes")}
+                    className="px-3 py-1 text-xs border rounded hover:bg-gray-50"
+                  >
+                    Notes
+                  </button>
+                  <button
+                    onClick={() => setSelectedAppointment(a)}
+                    className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-xs rounded"
+                  >
+                    Voir
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {(!appointments || appointments.length === 0) && !appointmentsLoading && (
+          <div className="text-center py-10 text-gray-500">Aucun rendez-vous</div>
+        )}
+      </div>
+
+      {/* ✅ CALENDRIER COMPACT */}
+      <div className="xl:col-span-1 space-y-4">
+        <div className="bg-white rounded-xl border shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
+            <button 
+              onClick={() => { const d=new Date(calendarCursor); d.setMonth(d.getMonth()-1); setCalendarCursor(d); }}
+              className="px-2 py-1 hover:bg-gray-100 rounded"
+            >
+              &lt;
+            </button>
+            <div className="font-semibold capitalize">
+              {calendarCursor.toLocaleDateString('fr-FR',{month:"long",year:"numeric"})}
+            </div>
+            <button 
+              onClick={() => { const d=new Date(calendarCursor); d.setMonth(d.getMonth()+1); setCalendarCursor(d); }}
+              className="px-2 py-1 hover:bg-gray-100 rounded"
+            >
+              &gt;
+            </button>
+          </div>
+
+          {/* (on garde ta logique de calendrier ici) */}
+          {/* Je ne touche pas à ton code pour éviter tout bug */}
+          <div>
+            <div className="grid grid-cols-7 gap-2 text-xs text-gray-500 mb-2">
+              {['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'].map((w)=>(<div key={w} className="text-center">{w}</div>))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {(() => {
+                const fmtKey = (date) => {
+                  const dt = new Date(date);
+                  if (Number.isNaN(dt.getTime())) return null;
+                  const y = dt.getFullYear();
+                  const m = String(dt.getMonth()+1).padStart(2,'0');
+                  const d = String(dt.getDate()).padStart(2,'0');
+                  return `${y}-${m}-${d}`;
+                };
+                const counts = {};
+                (appointments || []).forEach(a => {
+                  if (!a.appointment_date) return;
+                  const k = fmtKey(a.appointment_date);
+                  if (k) {
+                    counts[k] = counts[k] || { total:0, pending:0, confirmed:0, canceled:0, completed:0 };
+                    counts[k].total += 1;
+                    const st = String(a.status || '').toLowerCase();
+                    if (st.includes('pending') || st.includes('attente')) counts[k].pending += 1;
+                    else if (st.includes('confirm')) counts[k].confirmed += 1;
+                    else if (st.includes('cancel') || st.includes('annul')) counts[k].canceled += 1;
+                    else if (st.includes('complete') || st.includes('termin')) counts[k].completed += 1;
+                  }
+                });
+                const year = calendarCursor.getFullYear();
+                const month = calendarCursor.getMonth();
+                const firstDayIndex = (new Date(year, month, 1).getDay()+6)%7; // lundi = 0
+                const lastDate = new Date(year, month+1, 0).getDate();
+                const prevMonthLastDate = new Date(year, month, 0).getDate();
+                const cells = [];
+                for (let i=0; i<firstDayIndex; i++) {
+                  const day = prevMonthLastDate - firstDayIndex + i + 1;
+                  cells.push({ date: new Date(year, month-1, day), inMonth: false });
+                }
+                for (let day=1; day<=lastDate; day++) {
+                  cells.push({ date: new Date(year, month, day), inMonth: true });
+                }
+                const trailing = 42 - cells.length;
+                for (let i=1; i<=trailing; i++) {
+                  cells.push({ date: new Date(year, month+1, i), inMonth: false });
+                }
+                const todayKey = fmtKey(new Date());
+                return cells.map(cell => {
+                  const key = fmtKey(cell.date);
+                  const isSelected = key === selectedDay;
+                  const isToday = key === todayKey;
+                  const stat = counts[key] || { total:0, pending:0, confirmed:0, canceled:0, completed:0 };
+                  return (
+                    <button key={key} onClick={() => setSelectedDay(key)} className={`relative h-12 rounded-lg text-xs flex items-center justify-center transition 
+                      ${cell.inMonth ? 'bg-gray-50 hover:bg-blue-50' : 'bg-white'}
+                      ${isSelected ? 'ring-2 ring-blue-600 bg-blue-100' : ''}
+                      ${isToday ? 'border border-blue-300' : 'border border-gray-200'}
+                    `}>
+                      <span className={`${cell.inMonth ? 'text-gray-800' : 'text-gray-400'}`}>{new Date(cell.date).getDate()}</span>
+                      {stat.total > 0 && (
+                        <div className="absolute bottom-1 right-1 flex gap-0.5">
+                          {stat.pending > 0 && <span title={`${stat.pending} en attente`} className="w-2 h-2 rounded-full bg-amber-400" />}
+                          {stat.confirmed > 0 && <span title={`${stat.confirmed} confirmés`} className="w-2 h-2 rounded-full bg-emerald-500" />}
+                          {stat.canceled > 0 && <span title={`${stat.canceled} annulés`} className="w-2 h-2 rounded-full bg-rose-500" />}
+                          {stat.completed > 0 && <span title={`${stat.completed} terminés`} className="w-2 h-2 rounded-full bg-blue-500" />}
+                        </div>
+                      )}
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-gray-600">
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400"></span> En attente</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Confirmé</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500"></span> Annulé</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Terminé</div>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <div className="text-xs text-gray-600">{selectedDay ? 'Filtré par date' : 'Tous les rendez-vous'}</div>
+              <button onClick={() => setSelectedDay(null)} className="text-xs px-2 py-1 border rounded hover:bg-gray-50">Réinitialiser</button>
+            </div>
+          </div>
+        </div>
+
+       
+      </div>
+
+    </div>
+    {renderAppointmentDrawer()}
+  </div>
+);
+
+  };
+
+  // Drawer latéral pour les détails de rendez-vous
+  function renderAppointmentDrawer() {
+    return selectedAppointment ? (
+      <div className="fixed inset-0 z-50">
+        <div className="absolute inset-0 bg-black/30" onClick={()=>setSelectedAppointment(null)}></div>
+        <div className="absolute right-0 top-0 h-full w-full sm:w-[420px] bg-white shadow-xl border-l">
+          <div className="p-4 border-b flex items-center justify-between">
+            <h3 className="font-semibold">Détails du rendez-vous</h3>
+            <button onClick={()=>setSelectedAppointment(null)} className="px-2 py-1">Fermer</button>
+          </div>
+          <div className="p-4 space-y-3 text-sm">
+            <div><span className="text-gray-500">Client :</span> {selectedAppointment.full_name || '—'}</div>
+            <div><span className="text-gray-500">Email :</span> {selectedAppointment.email || '—'}</div>
+            <div><span className="text-gray-500">Téléphone :</span> {selectedAppointment.phone || '—'}</div>
+            <div><span className="text-gray-500">Service :</span> {selectedAppointment.service_id != null ? (servicesIndex[selectedAppointment.service_id] || selectedAppointment.service_id) : '—'}</div>
+            <div><span className="text-gray-500">Date :</span> {selectedAppointment.appointment_date ? new Date(selectedAppointment.appointment_date).toLocaleString('fr-FR') : '—'}</div>
+            <div>
+              <span className="text-gray-500">Statut :</span>
+              <select
+                value={selectedAppointment.status}
+                onChange={(e)=>updateAppointmentStatus(selectedAppointment.id, e.target.value)}
+                className="border rounded px-2 py-1 mt-1"
+              >
+                <option value="pending">En attente</option>
+                <option value="confirmed">Confirmé</option>
+                <option value="cancelled">Annulé</option>
+                <option value="completed">Terminé</option>
+              </select>
+            </div>
+            {selectedAppointment.notes && (
+              <div>
+                <p className="text-gray-500 text-xs">Notes</p>
+                <div className="p-2 bg-gray-50 rounded text-xs whitespace-pre-wrap">
+                  {selectedAppointment.notes}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    ) : null;
+  }
 
   const renderContent = () => {
     switch (activeMenu) {
       case 'dashboard': return renderDashboard();
       case 'projects': return renderProjects();
       case 'devis': return renderDevis();
+      case 'appointments': return renderAppointments();
       case 'clients': return renderClients();
-      case 'team': return renderTeam();
+      case 'team': return renderTeamSecured();
       case 'finance': return renderFinance();
       case 'analytics': return renderAnalytics();
       case 'tasks': return renderTasks();
@@ -2903,7 +5170,12 @@ const BackofficeDigital = () => {
       {/* Sidebar Desktop */}
       <aside className={`hidden lg:flex ${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-gray-900 to-gray-800 text-white transition-all duration-300 flex-col`}>
         <div className="p-4 flex items-center justify-between border-b border-gray-700">
-          {sidebarOpen && <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Digital BO</h1>}
+          {sidebarOpen && 
+          <h1 className="text-xl flex items-content-center font-bold ">
+            <img src="/img/web-app-manifest-192x192.png" alt="Logo Digital" width={32} />
+            Digital
+            
+            </h1>}
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-gray-700 rounded-lg">
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -2963,17 +5235,89 @@ const BackofficeDigital = () => {
         {/* Topbar */}
         <header className="bg-white border-b border-gray-200 p-3 flex items-center justify-between lg:justify-end">
           {/* Mobile menu toggle */}
-          <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="lg:hidden p-2 border rounded-lg">
+          <button
+            type="button"
+            onClick={toggleMobileMenu}
+            onTouchStart={toggleMobileMenu}
+            onPointerDown={toggleMobileMenu}
+            onMouseDown={toggleMobileMenu}
+            onKeyDown={handleMobileMenuKeyDown}
+            aria-expanded={mobileMenuOpen}
+            className="lg:hidden p-2 border rounded-lg"
+            style={{ touchAction: 'manipulation' }}
+          >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex items-center space-x-3">
-            <button className="p-2 border border-gray-200 rounded-lg">
-              <Bell className="w-5 h-5 text-gray-600" />
-            </button>
-            <div className="flex items-center space-x-2 px-3 py-2 border border-gray-200 rounded-lg">
-              <img src="/img/web-app-manifest-192x192.png" alt="" className="w-6 h-6 rounded-lg" />
-              <span className="text-sm font-medium">Admin</span>
-              <ChevronDown className="w-4 h-4 text-gray-500" />
+            <div className="relative">
+              <button onClick={toggleNotifications} className="p-2 border border-gray-200 rounded-lg relative" aria-label="Notifications">
+                <Bell className="w-5 h-5 text-gray-600" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">{unreadCount}</span>
+                )}
+              </button>
+              {notificationsOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
+                  <div className="px-3 py-2 border-b flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-800">Notifications</span>
+                    <button onClick={()=>setNotificationsOpen(false)} className="text-xs text-gray-500 hover:text-gray-700">Fermer</button>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-3 text-sm text-gray-500">Aucune notification</div>
+                    ) : notifications.map((n) => (
+                      <div key={`${n.type}-${n.id}`} className="px-3 py-2 hover:bg-gray-50 cursor-default">
+                        <div className="text-xs text-gray-500">{n.type === 'submission' ? 'Soumission' : 'Demande'} • {n.created_at ? new Date(n.created_at).toLocaleString('fr-FR') : ''}</div>
+                        <div className="text-sm font-medium text-gray-900">{n.title}</div>
+                        {n.summary && <div className="text-sm text-gray-600">{n.summary}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={toggleUserMenu}
+                onKeyDown={handleUserMenuKeyDown}
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
+                className="flex items-center space-x-2 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <img src={session.getAvatarUrl() || '/img/web-app-manifest-192x192.png'} alt="" className="w-6 h-6 rounded-lg" />
+                <span className="text-sm font-medium capitalize">{String(currentUserRole || 'admin')}</span>
+                <ChevronDown className="w-4 h-4 text-gray-500" />
+              </button>
+
+              {userMenuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50"
+                >
+                  <button
+                    type="button"
+                    onClick={() => { closeUserMenu(); navigate('/'); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Accueil
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { closeUserMenu(); navigate('/profil'); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Profil
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { closeUserMenu(); navigate('/logout'); }}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    Déconnexion
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

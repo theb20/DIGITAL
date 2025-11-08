@@ -12,6 +12,16 @@ export async function getUserByEmail(email) {
   }
 }
 
+export async function list() {
+  const res = await api.get('/users');
+  return res.data;
+}
+
+export async function get(id) {
+  const res = await api.get(`/users/${id}`);
+  return res.data;
+}
+
 export async function getCurrentUser() {
   const email = getSessionEmail();
   const user = await getUserByEmail(email);
@@ -20,4 +30,9 @@ export async function getCurrentUser() {
   return user;
 }
 
-export default { getUserByEmail, getCurrentUser };
+export async function update(id, data) {
+  const res = await api.put(`/users/${id}`, data);
+  return res.data;
+}
+
+export default { getUserByEmail, getCurrentUser, list, get, update };

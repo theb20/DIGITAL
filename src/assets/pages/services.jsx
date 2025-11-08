@@ -464,13 +464,15 @@ const handleServiceClick = async (service) => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button 
-                onClick={() => setShowProposalForm(true)}
+                onClick={() => navigate('/submission')}
                 className="px-8 py-4 bg-black/80 dark:bg-slate-700 text-white font-semibold rounded hover:bg-blue-800 transition-colors inline-flex items-center justify-center gap-2"
               >
                 Démarrer un projet
                 <ArrowRight className="w-5 h-5" />
               </button>
-              <button className="px-8 py-4 border-2 border-gray-300 text-dark font-semibold rounded hover:border-blue-900 hover:text-blue-900 transition-colors inline-flex items-center justify-center gap-2">
+              <button 
+              onclick={()=> navigate('/rendezvous')}
+              className="px-8 py-4 border-2 border-gray-300 text-dark font-semibold rounded hover:border-blue-900 hover:text-blue-900 transition-colors inline-flex items-center justify-center gap-2">
                 <Calendar className="w-5 h-5" />
                 Planifier un appel
               </button>

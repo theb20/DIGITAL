@@ -12,14 +12,20 @@ import {
   FaPhoneAlt,
   FaSearch as SearchIcon,
 } from "react-icons/fa";
+import { list } from "../configurations/services/appSettings.js";
 import {Moon, Sun } from 'lucide-react';
 
-const Header = ({openPopup}) => {
+const Header = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
     const [menuOpen, setMenuOpen] = useState(false);
     const [showSearch, setShowSearch] = useState(false);
+    const [appSettings, setAppSettings] = useState([]);
+    useEffect(() => {
+      list().then(data => setAppSettings(data));
+    }, []);
+    console.log(appSettings);
       const [darkMode, setDarkMode] = useState(() => {
     // Récupérer la préférence depuis localStorage au chargement
     const saved = localStorage.getItem('darkMode');
@@ -65,7 +71,6 @@ const Header = ({openPopup}) => {
     setDarkMode(!darkMode);
   };
 
-  const emailCookie = session.getSessionEmail();
   const avatarCookie = session.getAvatarUrl();
   const isLoggedIn = session.isAuthenticated();
 
@@ -73,6 +78,40 @@ const Header = ({openPopup}) => {
     <>
      {!isSignPage && !isBlogPage && !isResetPage && (
         <header className="w-full fixed top-0 left-0 z-50 bg-transparent transition-all duration-300">
+            {(() => {
+  if (!Array.isArray(appSettings)) return null;
+
+  const getByKey = (key) => appSettings.find(x => x?.setting_key === key);
+  const parseBool = (val) => {
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'number') return val !== 0;
+    if (typeof val === 'string') {
+      const v = val.trim().toLowerCase();
+      return v === 'true' || v === '1' || v === 'yes' || v === 'on' || v === 'enabled';
+    }
+    return false;
+  };
+
+  // Vérifie si le texte est actif
+  const activeSetting = getByKey('active_text_top_promo');
+  const isActive = activeSetting ? parseBool(activeSetting.setting_value) : false;
+  if (!isActive) return null;
+
+  // Récupère le texte
+  const textSetting = getByKey('text_top_promo');
+  const textValue = textSetting && textSetting.setting_value ? String(textSetting.setting_value) : '';
+  if (!textValue.trim()) return null;
+
+  return (
+    <div className="overflow-hidden relative bg-white/90 p-1">
+      <div className="flex animate-marquee">
+        <p className="whitespace-nowrap mr-10">{textValue}</p>
+        <p className="whitespace-nowrap mr-10">{textValue}</p>
+      </div>
+    </div>
+  );
+            })()}
+
             {/* ===== Barre supérieure (Desktop uniquement) ===== */}
             {!isProfilPage && (
             <div className={`hidden xl:flex justify-between backdrop-blur-md items-center px-6 xl:px-12 2xl:px-16 py-3 text-xs ${
@@ -81,12 +120,30 @@ const Header = ({openPopup}) => {
                 : 'dark:bg-gray-900 text-sub '
             }`}>
                 <div className="flex items-center space-x-6">
-                  <span className="flex items-center gap-2 hover:text-slate-100 transition-colors">
-                      <FaPhoneAlt className="text-slate-400 dark:text-white" /> +33 1 23 45 67 89
-                  </span>
-                  <span className="flex items-center gap-2 hover:text-slate-100 transition-colors">
-                      <FaGlobe className="text-slate-400 dark:text-white" />XOF | €  
-                  </span>
+                  {(() => {
+                    const s = Array.isArray(appSettings)
+                      ? appSettings.find(x => x?.setting_key === 'number')
+                      : null;
+                    return s && String(s.setting_type) === 'string' && s.setting_value
+                      ? (
+                        <span className="flex items-center gap-2 hover:text-slate-100 transition-colors">
+                          <FaPhoneAlt className="text-slate-400 dark:text-white" /> {s.setting_value}
+                        </span>
+                      )
+                      : null;
+                  })()}
+                  {(() => {
+                    const s = Array.isArray(appSettings)
+                      ? appSettings.find(x => x?.setting_key === 'currency')
+                      : null;
+                    return s && String(s.setting_type) === 'string' && s.setting_value
+                      ? (
+                        <span className="flex items-center gap-2 hover:text-slate-100 transition-colors">
+                          <FaGlobe className="text-slate-400 dark:text-white" /> {s.setting_value}
+                        </span>
+                      )
+                      : null;
+                  })()}
                 </div>
 
                 <div className="flex items-center gap-6 font-medium">
@@ -108,6 +165,7 @@ const Header = ({openPopup}) => {
                 </div>
             </div>
             )}
+            
             {!isFollowServicePage && !isSubmissionPage && !isBlogPage && !isCardPage && !isPrivacyPage && (
               <>
                 {/* ===== Barre principale ===== */}
@@ -326,9 +384,23 @@ const Header = ({openPopup}) => {
                     </div>
                 </div>
             </>) }  
+            <style jsx>{`
+              @keyframes marquee {
+                0% { transform: translateX(0%); }
+                100% { transform: translateX(-50%); }
+              }
+
+              .animate-marquee {
+                display: flex;
+                width: max-content;
+                animation: marquee 60s linear infinite;
+              }
+            `}</style>
         </header>
      )}
+
     </>
+    
   );
 };
 

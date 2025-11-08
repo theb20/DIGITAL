@@ -9,12 +9,12 @@ import {
 } from "lucide-react";
 
 import api from '../configurations/api/api_axios.js';
+import devisRequests from '../configurations/services/devisRequests.js';
 
 const QuoteComponent = ({ closePopup, mode = 'client', request = null }) => {
   const [showPreview, setShowPreview] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveSuccess] = useState(false);
   const [respondSuccess, setRespondSuccess] = useState(false);
 
   // Services digitaux avec icônes et descriptions
@@ -246,14 +246,7 @@ TVA non applicable – Article 293 B du CGI.`,
 
   const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
 
-  const handleSave = () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setIsSaving(false);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    }, 1500);
-  };
+  // (retiré) handleSave inutilisé
 
   const handleDownload = () => {
     if (!showPreview) {
@@ -266,9 +259,61 @@ TVA non applicable – Article 293 B du CGI.`,
     }
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (validateStep(1) && validateStep(2)) {
-      alert(`✅ Devis envoyé avec succès à ${quoteData.clientEmail}`);
+      try {
+        // Calcul montant estimé et remise
+        const totalBeforeDiscount = (quoteData.items || []).reduce((sum, it) => {
+          const qty = Number(it.quantity) || 0;
+          const price = Number(it.unitPrice) || 0;
+          return sum + qty * price;
+        }, 0);
+        const discountValue = quoteData.discountType === 'percent'
+          ? (totalBeforeDiscount * (Number(quoteData.discount) || 0)) / 100
+          : (Number(quoteData.discount) || 0);
+        const estimation_amount = Math.max(0, Math.round(totalBeforeDiscount - discountValue));
+
+        // 1) Assurer une demande existante (sinon créer)
+        let requestId = request?.id || null;
+        if (requestId) {
+          await api.put(`/devis/requests/${requestId}`, { status: 'envoyé' });
+        } else {
+          const created = await devisRequests.create({
+            full_name: quoteData.clientName || '',
+            email: quoteData.clientEmail || '',
+            phone: quoteData.clientPhone || null,
+            project_type: quoteData.projectCategory || null,
+            project_description: quoteData.notes || '',
+            status: 'envoyé',
+          });
+          requestId = created?.id;
+          if (!requestId) throw new Error('Création de la demande échouée');
+        }
+
+        // 2) Créer une soumission liée (sans PDF pour le moment)
+        const { data: submission } = await api.post('/devis/submissions', {
+          request_id: requestId,
+          provider_id: null,
+          estimation_amount,
+          delivery_time: quoteData.projectDeadline || null,
+          message: quoteData.notes || null,
+          status: 'envoyé',
+        });
+
+        // 3) Envoyer l'email au client
+        try {
+          if (submission?.id) {
+            await api.post(`/devis/submissions/${submission.id}/send-email`, {});
+          }
+        } catch (e) {
+          console.warn('Envoi email devis échoué:', e?.message || e);
+        }
+
+        setRespondSuccess(true);
+        setTimeout(() => setRespondSuccess(false), 3000);
+      } catch (e) {
+        alert(e?.message || 'Erreur lors de la validation du devis');
+      }
     }
   };
 
@@ -304,7 +349,7 @@ TVA non applicable – Article 293 B du CGI.`,
       const userModule = await import('../configurations/services/user.js');
       const currentUser = await userModule.getCurrentUser();
       currentUserId = currentUser?.id || null;
-    } catch (_) {
+    } catch {
       currentUserId = null;
     }
     if (!currentUserId) {
@@ -319,19 +364,82 @@ TVA non applicable – Article 293 B du CGI.`,
       status: 'envoyé',
     };
 
+    let created = null;
     if (pdf_base64 && pdf_name) {
-      await api.post('/devis/submissions/with-pdf', {
+      const { data } = await api.post('/devis/submissions/with-pdf', {
         ...basePayload,
         pdf_base64,
         pdf_name,
         mime_type: 'application/pdf',
       });
+      created = data;
     } else {
-      await api.post('/devis/submissions', basePayload);
+      const { data } = await api.post('/devis/submissions', basePayload);
+      created = data;
     }
 
+    // Envoyer l'email au client (réponse admin)
+    try {
+      if (created?.id) {
+        await api.post(`/devis/submissions/${created.id}/send-email`, {});
+      }
+    } catch (e) {
+      console.warn('Envoi email devis échoué:', e?.message || e);
+    }
     // Mettre à jour le statut de la demande
     await api.put(`/devis/requests/${request.id}`, { status: 'envoyé' });
+    setRespondSuccess(true);
+    setTimeout(() => setRespondSuccess(false), 3000);
+  };
+
+  // Envoi côté client avec PDF optionnel (utilisé par onRespond)
+  const sendClientSubmissionWithPdf = async ({ estimation_amount, delivery_time, message, pdf_base64 = null, pdf_name = null }) => {
+    let requestId = request?.id || null;
+    if (!requestId) {
+      const created = await devisRequests.create({
+        full_name: quoteData.clientName || '',
+        email: quoteData.clientEmail || '',
+        phone: quoteData.clientPhone || null,
+        project_type: quoteData.projectCategory || null,
+        project_description: quoteData.notes || '',
+        status: 'envoyé',
+      });
+      requestId = created?.id;
+      if (!requestId) throw new Error('Création de la demande échouée');
+    } else {
+      await api.put(`/devis/requests/${requestId}`, { status: 'envoyé' });
+    }
+
+    const basePayload = {
+      request_id: requestId,
+      provider_id: null,
+      estimation_amount: Number(estimation_amount) || 0,
+      delivery_time: delivery_time || null,
+      message: message || null,
+      status: 'envoyé',
+    };
+
+    let created = null;
+    if (pdf_base64 && pdf_name) {
+      const { data } = await api.post('/devis/submissions/with-pdf', {
+        ...basePayload,
+        pdf_base64,
+        pdf_name,
+        mime_type: 'application/pdf',
+      });
+      created = data;
+    } else {
+      const { data } = await api.post('/devis/submissions', basePayload);
+      created = data;
+    }
+
+    try {
+      if (created?.id) {
+        await api.post(`/devis/submissions/${created.id}/send-email`, {});
+      }
+    } catch (e) {
+      console.warn('Envoi email devis échoué:', e?.message || e);
+    }
     setRespondSuccess(true);
     setTimeout(() => setRespondSuccess(false), 3000);
   };
@@ -1203,38 +1311,19 @@ TVA non applicable – Article 293 B du CGI.`,
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
                 <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                   <Zap className="w-5 h-5 text-black" />
-                  Actions Finales
+                  Action Finale
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <button
-                    onClick={handleSave}
-                    disabled={isSaving}
-                    className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 shadow-md hover:shadow-lg"
-                  >
-                    <Save className="w-5 h-5" />
-                    {isSaving ? "Sauvegarde..." : "Sauvegarder"}
-                  </button>
+                  
                   <button
                     onClick={() => setShowPreview(true)}
                     className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
                   >
                     <Eye className="w-5 h-5" />
-                    Aperçu PDF
+                    Voir et continuer
                   </button>
-                  <button
-                    onClick={handleDownload}
-                    className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
-                  >
-                    <Download className="w-5 h-5" />
-                    Télécharger
-                  </button>
-                  <button
-                    onClick={handleSend}
-                    className="flex items-center justify-center gap-2 px-6 py-4 bg-slate-600 hover:bg-slate-700 text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
-                  >
-                    <Send className="w-5 h-5" />
-                    Envoyer
-                  </button>
+                
+                  
                 </div>
                 
                 {saveSuccess && (
@@ -1266,15 +1355,15 @@ TVA non applicable – Article 293 B du CGI.`,
 
       {/* Preview Modal */}
       {showPreview && (
-  <QuotePreview
-    quoteData={quoteData}
-    request={request}
-    mode={mode}
-    onClose={() => setShowPreview(false)}
-    onSend={handleSend}
-    onDownload={handleDownload}
-    onRespond={mode === 'backoffice' ? sendBackofficeResponse : undefined}
-  />
+        <QuotePreview
+          quoteData={quoteData}
+          request={request}
+          mode={mode}
+          onClose={() => setShowPreview(false)}
+          onSend={handleSend}
+          onDownload={handleDownload}
+          onRespond={mode === 'backoffice' ? sendBackofficeResponse : sendClientSubmissionWithPdf}
+        />
 )}
 
       {respondSuccess && (

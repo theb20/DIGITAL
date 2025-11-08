@@ -25,6 +25,7 @@ import FollowService from "./assets/pages/followService.jsx"
 import Logout from "./assets/pages/logout.jsx"
 import Backoffice from "./assets/pages/backoffice.jsx"
 import Inbox from "./assets/pages/inbox.jsx"
+import Rendezvous from "./assets/pages/rendezvous.jsx"
 
 // Page 404 optionnelle
 const NotFound = ({
@@ -173,8 +174,14 @@ function App() {
 
             {/* Page 404 */}
             <Route path="*" element={<NotFound />} />
+            <Route path="/rendezvous" element={<Rendezvous />} />
             <Route path="/logout" element={<Logout />} />
             <Route path="/backoffice" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+            <Route path="/backoffice/clients" element={
                 <RequireAuth_admin allowedRoles={['admin', 'manager']}>
                   <Backoffice />
                 </RequireAuth_admin >
@@ -194,13 +201,18 @@ function App() {
                   <Backoffice />
                 </RequireAuth_admin >
               } />
+            <Route path="/backoffice/appointments" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
               <Route path="/backoffice/messages" element={
                 <RequireAuth_admin allowedRoles={['admin', 'manager']}>
                   <Backoffice />
                 </RequireAuth_admin >
               } />
-            <Route path="/backoffice/categories" element={
-                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+            <Route path="/backoffice/parametre" element={
+                <RequireAuth_admin allowedRoles={['admin']}>
                   <Backoffice />
                 </RequireAuth_admin >
               } />

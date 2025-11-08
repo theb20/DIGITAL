@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Building2, Code, Palette, Zap, CheckSquare, Printer, Camera, Search, Mail, ExternalLink, Eye, Filter, Grid3x3, LayoutGrid, X, Calendar, User, Tag } from 'lucide-react';
+import { FileText, Building2, Code, Palette, Zap, CheckSquare, Printer, Camera, Search, Mail, ExternalLink, Eye, Filter, Grid3x3, LayoutGrid, X, Calendar, User, Tag, Table } from 'lucide-react';
+import projectsApi from '../configurations/services/projects.js';
 
 export default function DigitalPortfolio() {
   useEffect(()=>{
@@ -9,6 +10,9 @@ export default function DigitalPortfolio() {
   const [viewMode, setViewMode] = useState('grid');
   const [selectedProject, setSelectedProject] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [projectsData, setProjectsData] = useState([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [errorProjects, setErrorProjects] = useState(null);
 
   const openModal = (project) => {
     setSelectedProject(project);
@@ -168,9 +172,29 @@ export default function DigitalPortfolio() {
     }
   ];
 
+  // Charger les projets via API (GET)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoadingProjects(true);
+        const items = await projectsApi.list();
+        if (mounted) setProjectsData(Array.isArray(items) ? items : []);
+      } catch (e) {
+        if (mounted) setErrorProjects(e?.message || 'Erreur lors du chargement des projets');
+        // Fallback: données statiques
+        if (mounted) setProjectsData(projects);
+      } finally {
+        if (mounted) setLoadingProjects(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const sourceProjects = projectsData.length ? projectsData : projects;
   const filteredProjects = activeCategory === 'Tous' 
-    ? projects 
-    : projects.filter(p => p.category === activeCategory);
+    ? sourceProjects 
+    : sourceProjects.filter(p => p.category === activeCategory);
 
   const stats = [
     { label: 'Projets Réalisés', value: '250+', icon: CheckSquare },
@@ -235,6 +259,16 @@ export default function DigitalPortfolio() {
                 }`}
               >
                 <LayoutGrid className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === 'table' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Table className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -385,6 +419,56 @@ export default function DigitalPortfolio() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {viewMode === 'table' && (
+          <div className="overflow-x-auto bg-white rounded-xl border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Image</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Titre</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Catégorie</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Client</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Année</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600">Tags</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredProjects.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <img src={p.image || p.image_url} alt={p.title} className="w-16 h-10 object-cover rounded" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-900">{p.title}</div>
+                      <div className="text-xs text-slate-500 line-clamp-1">{p.description}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-xs font-semibold px-3 py-1 bg-blue-100 text-blue-700 rounded-full">{p.category}</span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">{p.client}</td>
+                    <td className="px-4 py-3 text-slate-700">{p.year}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {(Array.isArray(p.tags) ? p.tags : []).map((t, i) => (
+                          <span key={i} className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {loadingProjects && (
+              <div className="px-4 py-3 text-sm text-slate-500">Chargement des projets…</div>
+            )}
+            {errorProjects && (
+              <div className="px-4 py-3 text-sm text-red-600">{errorProjects}</div>
+            )}
           </div>
         )}
 

@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { getCookie } from './cookies.js';
 
 const rawBase = import.meta.env.VITE_API_URL || '';
 const baseURL = rawBase.endsWith('/api')
@@ -18,12 +17,8 @@ const api = axios.create({
 // Intercepteur pour les requêtes
 api.interceptors.request.use(
   (config) => {
-    // Ajouter l'acteur côté client pour la vérification des permissions backend
-    const email = getCookie('current_user_email');
-    const role = getCookie('role');
-    if (!config.headers) config.headers = {};
-    if (email) config.headers['x-user-email'] = String(email);
-    if (role) config.headers['x-user-role'] = String(role);
+    // Désactivation des en-têtes personnalisés pour éviter les erreurs CORS en développement
+    // (Vite proxy est utilisé pour router les requêtes vers le backend)
     return config;
   },
   (error) => {

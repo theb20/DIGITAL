@@ -5,8 +5,10 @@ import {
 } from "lucide-react";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { PDFDownloadLink } from '@react-pdf/renderer';
+import QuotePDF from './QuotePDF.jsx';
 
-const QuotePreview = ({ quoteData, request = null, mode = 'client', onClose, onSend, onDownload, onRespond }) => {
+const QuotePreview = ({ quoteData, request = null, mode = 'client', onClose, onSend, onRespond }) => {
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -46,7 +48,59 @@ const QuotePreview = ({ quoteData, request = null, mode = 'client', onClose, onS
 
   const quoteRef = useRef(null);
 
-  const handleRespond = async () => {
+  // Style de secours appliqué pendant la capture pour éviter les couleurs non supportées (oklch)
+  React.useEffect(() => {
+    const style = document.createElement("style");
+    style.setAttribute('data-pdf-capture-fallback', 'true');
+    style.textContent = `
+      /* Fallback couleurs/effets pendant capture (évite oklch, filters…) */
+      .pdf-capture, .pdf-capture * {
+        color: #111 !important;
+        background-color: #ffffff !important;
+        border-color: #e5e7eb !important;
+        box-shadow: none !important;
+        filter: none !important;
+        mix-blend-mode: normal !important;
+      }
+
+      /* Mapping des classes Tailwind utilisées vers des couleurs sRGB stables */
+      #pdf-content .text-slate-900 { color: #0f172a !important; }
+      #pdf-content .text-slate-700 { color: #334155 !important; }
+      #pdf-content .text-slate-600 { color: #475569 !important; }
+      #pdf-content .text-gray-900 { color: #111827 !important; }
+      #pdf-content .text-gray-700 { color: #374151 !important; }
+      #pdf-content .text-gray-600 { color: #4b5563 !important; }
+      #pdf-content .text-indigo-900 { color: #312e81 !important; }
+      #pdf-content .text-indigo-700 { color: #4338ca !important; }
+      #pdf-content .bg-white { background-color: #ffffff !important; }
+      #pdf-content .bg-slate-50 { background-color: #f8fafc !important; }
+      #pdf-content .bg-gray-50 { background-color: #f9fafb !important; }
+      #pdf-content .bg-indigo-50 { background-color: #eef2ff !important; }
+      /* Utiliser un sélecteur d’attribut pour cibler la classe Tailwind avec "/" */
+      #pdf-content [class*="border-black/10"] { border-color: rgba(0,0,0,0.1) !important; }
+      #pdf-content .border-indigo-200 { border-color: #c7d2fe !important; }
+      #pdf-content .border-gray-200 { border-color: #e5e7eb !important; }
+
+      /* Stabiliser les grilles pendant la capture (évite chevauchements) */
+      #pdf-content .grid { display: grid !important; }
+      #pdf-content [class*="grid-cols-2"] { grid-template-columns: 1fr 1fr !important; }
+      #pdf-content [class*="md:grid-cols-2"] { grid-template-columns: 1fr 1fr !important; }
+      #pdf-content [class*="gap-4"] { gap: 1rem !important; }
+      #pdf-content [class*="gap-6"] { gap: 1.5rem !important; }
+      #pdf-content [class*="gap-8"] { gap: 2rem !important; }
+
+      /* Recréer les utilitaires space-y-* que html2canvas ignore parfois */
+      #pdf-content .space-y-2 > * + * { margin-top: 0.5rem !important; }
+      #pdf-content .space-y-3 > * + * { margin-top: 0.75rem !important; }
+      #pdf-content .space-y-4 > * + * { margin-top: 1rem !important; }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      if (style && style.parentNode) style.parentNode.removeChild(style);
+    };
+  }, []);
+
+  const _handleRespond = async () => {
     if (!onRespond) return;
     setSending(true);
     setSendError(null);
@@ -58,28 +112,34 @@ const QuotePreview = ({ quoteData, request = null, mode = 'client', onClose, onS
         setIsCapturing(true);
         await new Promise(r => setTimeout(r, 100));
         const canvas = await html2canvas(quoteRef.current, {
-          scale: Math.max(2, window.devicePixelRatio || 2),
+          scale: Math.max(2, (window.devicePixelRatio || 2)),
           useCORS: true,
-          allowTaint: true,
-          background: '#ffffff',
-          scrollY: -window.scrollY,
-          foreignObjectRendering: true,
+          allowTaint: false,
+          backgroundColor: '#ffffff',
+          scrollY: 0,
+          foreignObjectRendering: false,
+          imageTimeout: 15000,
           logging: false,
         });
-        const imgData = canvas.toDataURL('image/png');
+        // Utiliser JPEG avec compression pour réduire significativement la taille
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
         const pdf = new jsPDF('p', 'pt', 'a4');
         const pageWidth = pdf.internal.pageSize.getWidth();
         const pageHeight = pdf.internal.pageSize.getHeight();
-        // Adapter pour tenir sur une seule page A4
-        const scaleToFit = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
-        const imgWidth = canvas.width * scaleToFit;
-        const imgHeight = canvas.height * scaleToFit;
-        const offsetX = (pageWidth - imgWidth) / 2;
-        const offsetY = 0; // haut de page
-        pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
+        // Remplir toute la largeur A4 et centrer verticalement si nécessaire
+        const imgWidth = pageWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        const offsetX = 0;
+        const offsetY = Math.max(0, (pageHeight - imgHeight) / 2);
+        // Peindre un fond blanc avant d'insérer l'image
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+        pdf.addImage(imgData, 'JPEG', offsetX, offsetY, imgWidth, imgHeight);
         const dataUri = pdf.output('datauristring');
-        const prefix = 'data:application/pdf;base64,';
-        pdf_base64 = dataUri.startsWith(prefix) ? dataUri.slice(prefix.length) : null;
+        // Supporte les data URI contenant des paramètres (ex: ;filename=...;base64,)
+        const marker = 'base64,';
+        const idx = dataUri.indexOf(marker);
+        pdf_base64 = idx !== -1 ? dataUri.slice(idx + marker.length) : null;
         pdf_name = `Devis_Digital_${request.id}_${Date.now()}.pdf`;
         setIsCapturing(false);
       }
@@ -100,40 +160,57 @@ const QuotePreview = ({ quoteData, request = null, mode = 'client', onClose, onS
   };
 
   const handleDownloadLocal = async () => {
-    setDownloading(true);
-    try {
-      if (!quoteRef.current) throw new Error('Contenu du devis introuvable');
-      setIsCapturing(true);
-      await new Promise(r => setTimeout(r, 100));
-      const canvas = await html2canvas(quoteRef.current, {
-        scale: Math.max(2, window.devicePixelRatio || 2),
-        useCORS: true,
-        allowTaint: true,
-        background: '#ffffff',
-        scrollY: -window.scrollY,
-        foreignObjectRendering: true,
-        logging: false,
-      });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'pt', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      // Adapter pour tenir sur une seule page A4
-      const scaleToFit = Math.min(pageWidth / canvas.width, pageHeight / canvas.height);
-      const imgWidth = canvas.width * scaleToFit;
-      const imgHeight = canvas.height * scaleToFit;
-      const offsetX = (pageWidth - imgWidth) / 2;
-      const offsetY = 0;
-      pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgWidth, imgHeight);
-      const fileName = `Devis_Digital_${request?.id ?? 'SansID'}_${Date.now()}.pdf`;
-      pdf.save(fileName);
-    } catch (e) {
-      alert(e?.message || 'Échec du téléchargement du PDF');
-    } finally {
-      setDownloading(false);
-      setIsCapturing(false);
+  setDownloading(true);
+  try {
+    if (!quoteRef.current) throw new Error('Contenu du devis introuvable');
+    setIsCapturing(true);
+    await new Promise(r => setTimeout(r, 100));
+
+    const canvas = await html2canvas(quoteRef.current, {
+      scale: Math.max(2, (window.devicePixelRatio || 2)),
+      useCORS: true,
+      allowTaint: false,
+      backgroundColor: '#ffffff',
+      scrollY: 0,
+      foreignObjectRendering: false,
+      imageTimeout: 15000,
+      logging: false,
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.85);
+    const pdf = new jsPDF('p', 'pt', 'a4');
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    let imgHeight = (canvas.height * pageWidth) / canvas.width;
+    let heightLeft = imgHeight;
+    let position = 0;
+
+    // Page 1: fond blanc + image
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+    pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft > 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+      pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight);
+      heightLeft -= pageHeight;
     }
-  };
+
+    pdf.save(`Devis_${request?.id ?? 'SansID'}_${Date.now()}.pdf`);
+  } catch (e) {
+    alert(e?.message || 'Échec du téléchargement du PDF');
+  } finally {
+    setDownloading(false);
+    setIsCapturing(false);
+  }
+};
+
 
 React.useEffect(() => {
   const style = document.createElement("style");
@@ -146,8 +223,8 @@ React.useEffect(() => {
       }
       
       html, body {
-        width: 210mm !important;
-        height: 297mm !important;
+        width: 1cm !important;
+        height: 1cm !important;
         margin: 0 !important;
         padding: 0 !important;
         overflow: hidden !important;
@@ -163,13 +240,13 @@ React.useEffect(() => {
       
       @page {
         size: A4;
-        margin: 0mm;
+        margin: 1cm !important;
       }
       
       /* Container principal - 1 PAGE FIXE */
       #pdf-content {
-        width: 210mm !important;
-        height: 297mm !important;
+        width: 1cm !important;
+        height: 1cm !important;
         padding: 8mm 12mm !important;
         margin: 0 !important;
         overflow: hidden !important;
@@ -296,32 +373,10 @@ React.useEffect(() => {
       display: flex !important;
       flex-direction: column !important;
     }
-    .pdf-capture * {
-      font-size: 12px !important;
-      line-height: 1.25 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
+    /* Conserver les espacements et typographies d’origine pour éviter le mélange visuel */
     .pdf-capture .no-page-break { page-break-inside: avoid !important; }
     .pdf-capture .terms-page-break { display: none !important; }
     .pdf-capture .print-hidden { display: none !important; }
-    .pdf-capture .mb-12 { margin-bottom: 8px !important; }
-    .pdf-capture .mb-8 { margin-bottom: 6px !important; }
-    .pdf-capture .mb-4 { margin-bottom: 4px !important; }
-    .pdf-capture .pb-8 { padding-bottom: 6px !important; }
-    .pdf-capture .pt-8 { padding-top: 6px !important; }
-    .pdf-capture .mt-12 { margin-top: 8px !important; }
-    .pdf-capture .p-6, .pdf-capture .p-4, .pdf-capture .px-8, .pdf-capture .py-6 { padding: 6px !important; }
-    .pdf-capture .px-4, .pdf-capture .py-4, .pdf-capture .py-3 { padding: 4px !important; }
-    .pdf-capture img { max-width: 32px !important; max-height: 32px !important; }
-    .pdf-capture table { margin: 0 !important; }
-    .pdf-capture table th, .pdf-capture table td { padding: 4px !important; font-size: 10px !important; }
-    .pdf-capture .h-20 { height: 60px !important; }
-    .pdf-capture .grid-cols-2 { gap: 6px !important; }
-    .pdf-capture .border-2 { border-width: 1px !important; }
-    .pdf-capture .border-b-2 { border-bottom-width: 1px !important; }
-    .pdf-capture .border-t-2 { border-top-width: 1px !important; }
-    .pdf-capture svg { width: 12px !important; height: 12px !important; }
   `;
   document.head.appendChild(style);
   return () => document.head.removeChild(style);
@@ -374,10 +429,10 @@ React.useEffect(() => {
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-16 h-16">
-                  <img src="/img/web-app-manifest-512x512.png" alt="logo entreprise" />
+                  <img src="/img/web-app-manifest-512x512.png" alt="logo entreprise" crossOrigin="anonymous" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-slate-900">DIGITAL</h1>
+                  <h1 className="text-2xl font-bold text-slate-900">DIGITAL</h1>
                   <p className="text-black font-medium">Solutions Digitales & Créatives</p>
                 </div>
               </div>
@@ -602,15 +657,6 @@ React.useEffect(() => {
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
                   />
                 </div>
-                <div className="flex items-end">
-                  <button
-                    onClick={handleRespond}
-                    disabled={!onRespond || sending}
-                    className="w-full px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-900 disabled:opacity-50"
-                  >
-                    {sending ? 'Envoi…' : 'Envoyer la réponse'}
-                  </button>
-                </div>
               </div>
               <textarea
                 value={replyMessage}
@@ -632,20 +678,33 @@ React.useEffect(() => {
               Fermer l'aperçu
             </button>
             <div className="flex gap-3">
+             
               <button
-                onClick={onSend}
+                onClick={onRespond ? _handleRespond : onSend}
+                disabled={sending || (!onRespond && !onSend)}
                 className="flex items-center gap-2 px-6 py-3 bg-black text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
               >
                 <Send className="w-5 h-5" />
-                Envoyer par Email
+                {sending ? 'Envoi…' : 'Envoyer le Devis'}
               </button>
               <button
                 onClick={handleDownloadLocal}
                 className="flex items-center gap-2 px-6 py-3 bg-white hover:bg-gray-100 text-black font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg"
               >
                 <Download className="w-5 h-5" />
-                {downloading ? 'Téléchargement…' : 'Télécharger PDF'}
+                {downloading ? 'Téléchargement…' : 'Télécharger PDF (bitmap)'}
               </button>
+              <PDFDownloadLink
+                document={<QuotePDF quoteData={quoteData} request={request} />}
+                fileName={`${quoteData?.reference || 'devis'}.pdf`}
+              >
+                {({ loading }) => (
+                  <span className="flex items-center gap-2 px-6 py-3 bg-black text-white font-semibold rounded-lg transition-colors shadow-md hover:shadow-lg cursor-pointer">
+                    <Download className="w-5 h-5" />
+                    {loading ? 'Préparation…' : 'Télécharger PDF (vectoriel)'}
+                  </span>
+                )}
+              </PDFDownloadLink>
             </div>
           </div>
         </div>

@@ -170,6 +170,29 @@ CREATE TABLE blogs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
+-- 🗓️ TABLE RENDEZ-VOUS
+CREATE TABLE appointments (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT UNSIGNED NULL,
+    full_name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    phone VARCHAR(30) DEFAULT NULL,
+    service_id BIGINT UNSIGNED NULL,
+    appointment_date DATETIME NOT NULL,
+    channel VARCHAR(50) DEFAULT NULL, -- ex: visio, telephone, en_personne
+    notes TEXT DEFAULT NULL,
+    status ENUM('pending','confirmed','cancelled','completed') DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE SET NULL,
+    INDEX idx_user(user_id),
+    INDEX idx_service(service_id),
+    INDEX idx_date(appointment_date),
+    INDEX idx_status(status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
 -- 🔒 TABLE POLITIQUE DE CONFIDENTIALITÉ
 CREATE TABLE privacy_page (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
