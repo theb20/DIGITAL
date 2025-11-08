@@ -18,6 +18,7 @@ export const create = async (data) => {
   const {
     first_name,
     last_name,
+    position = null,
     email,
     provider,
     provider_id,
@@ -30,9 +31,9 @@ export const create = async (data) => {
 
   const result = await query(
     `INSERT INTO users 
-    (first_name, last_name, email, provider, provider_id, role, avatar, is_active, session_status, last_login)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [first_name, last_name, email, provider, provider_id, role, avatar, is_active, session_status, last_login]
+    (first_name, last_name, position, email, provider, provider_id, role, avatar, is_active, session_status, last_login)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [first_name, last_name, position, email, provider, provider_id, role, avatar, is_active, session_status, last_login]
   );
 
   return await findById(result.insertId);
@@ -40,7 +41,7 @@ export const create = async (data) => {
 
 export const update = async (id, data) => {
   const allowed = [
-    "first_name", "last_name", "email", "provider", "provider_id",
+    "first_name", "last_name", "position", "email", "provider", "provider_id",
     "role", "avatar", "is_active", "session_status", "last_login"
   ];
 

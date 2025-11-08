@@ -18,6 +18,13 @@ import commentsRoutes from "./routes/comments.routes.js";
 import privacyRoutes from "./routes/privacy.routes.js";
 import contactRoutes from "./routes/contact.routes.js";
 import blogsRoutes from "./routes/blogs.routes.js";
+import promosRoutes from "./routes/promos.routes.js";
+import appSettingsRoutes from "./routes/appSettings.routes.js";
+import profilesRoutes from "./routes/profiles.routes.js";
+import scraperRoutes from "./routes/scraper.routes.js";
+import projectsRoutes from "./routes/projects.routes.js";
+import appointmentsRoutes from "./routes/appointments.routes.js";
+import { up as migrateAppointments } from "./scripts/add_appointments_table.js";
 
 
 // ============================================
@@ -118,8 +125,8 @@ app.use(helmet({
 app.use(cors(corsOptions));
 
 // Body parsers avec limite de taille
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb", parameterLimit: 100000 }));
 
 // Logger HTTP
 app.use(morgan(NODE_ENV === "production" ? "combined" : "dev"));
@@ -219,6 +226,12 @@ app.use("/api/comments", commentsRoutes);
 app.use("/api/privacy", privacyRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/blogs", blogsRoutes);
+app.use("/api/promos", promosRoutes);
+app.use("/api/app-settings", appSettingsRoutes);
+app.use("/api/scrape", scraperRoutes);
+app.use("/api/projects", projectsRoutes);
+app.use("/api/profiles", profilesRoutes);
+app.use("/api/appointments", appointmentsRoutes);
 // ============================================
 // Gestion des routes non trouvées (404)
 // ============================================
@@ -314,6 +327,15 @@ const startServer = async () => {
     console.log("🔄 Test de connexion à la base de données...");
     await testConnection();
     console.log("✅ Base de données connectée");
+
+    // Migration légère: assurer la table appointments
+    try {
+      console.log("🔧 Vérification/Création de la table appointments...");
+      await migrateAppointments();
+      console.log("✅ Table appointments OK");
+    } catch (migErr) {
+      console.error("⚠️  Migration appointments non exécutée:", migErr?.message || migErr);
+    }
 
     // Démarrer le serveur
     const server = app.listen(PORT, '0.0.0.0', () => {

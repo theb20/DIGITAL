@@ -1,5 +1,5 @@
 import express from "express";
-import * as Controller from "../controllers/comments.controller.js";
+import * as Controller from "../controllers/projects.controller.js";
 
 const router = express.Router();
 
@@ -8,9 +8,5 @@ router.get("/:id", Controller.get);
 router.post("/", Controller.create);
 router.put("/:id", Controller.update);
 router.delete("/:id", Controller.remove);
-
-// Réactions (likes/dislikes)
-router.post("/:id/like", Controller.like);
-router.post("/:id/dislike", Controller.dislike);
 
 export default router;
