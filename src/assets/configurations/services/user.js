@@ -30,9 +30,4 @@ export async function getCurrentUser() {
   return user;
 }
 
-export async function update(id, data) {
-  const res = await api.put(`/users/${id}`, data);
-  return res.data;
-}
-
-export default { getUserByEmail, getCurrentUser, list, get, update };
+export default { getUserByEmail, getCurrentUser, list, get };

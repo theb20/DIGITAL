@@ -218,7 +218,7 @@ export default function FilterFinderHome() {
             </div>
 
             {/* Composant de recherche au-dessus */}
-            <div className="relative z-10">
+            <div className="relative ">
               <SearchComponent />
             </div>
           </div>

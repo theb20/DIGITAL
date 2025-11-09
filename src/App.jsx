@@ -26,6 +26,7 @@ import Logout from "./assets/pages/logout.jsx"
 import Backoffice from "./assets/pages/backoffice.jsx"
 import Inbox from "./assets/pages/inbox.jsx"
 import Rendezvous from "./assets/pages/rendezvous.jsx"
+import Pay from "./assets/pages/Pay.jsx"
 
 // Page 404 optionnelle
 const NotFound = ({
@@ -226,6 +227,8 @@ function App() {
                   <FollowService />
                 </RequireAuth>
               } />
+
+              <Route path="/pay/:link" element={<Pay />} />
           </Routes>
           
           

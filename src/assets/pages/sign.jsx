@@ -128,7 +128,8 @@ const AuthPage = () => {
           </div>
 
           {/* Social Buttons */}
-          <div className="space-y-3">
+          <div style={{ width: "100%" }}>
+          
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
               onError={handleGoogleError}
@@ -136,6 +137,7 @@ const AuthPage = () => {
               size="large"
               text="continue_with"
               shape="rectangular"
+              style={{ width: "100%" }}
             />
 
             {error && (

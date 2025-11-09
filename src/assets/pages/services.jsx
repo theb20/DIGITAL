@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Search, Building2, ChevronRight, Check, ArrowRight, Briefcase, Target, Lightbulb, BarChart, Shield, Cog, FileText, Send, CheckCircle, MessageSquare, Calendar, Code, Palette, Zap, CheckSquare, Printer, Camera, Mail, X, Eye  } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Search, Building2, ChevronRight, Check, ArrowRight, Briefcase, Lightbulb, Cog, FileText, Send, CheckCircle, MessageSquare, Calendar, Code, Palette, Zap, CheckSquare, Printer, Camera, Mail, Eye  } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import servicesApi from '../configurations/services/services.js';
 import serviceCategoriesApi from '../configurations/services/serviceCategories.js';
 
@@ -9,24 +9,13 @@ export default function ServicesPage() {
       document.title = "Nos services - Digital";
     })
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedCategory, setSelectedCategory] = useState('Tous');
   const [searchQuery, setSearchQuery] = useState('');
   const [services, setServices] = useState([]);
-  const [loadingServices, setLoadingServices] = useState(false);
   const [categoryById, setCategoryById] = useState({});
   const [categoryIconById, setCategoryIconById] = useState({});
-  const [showProposalForm, setShowProposalForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: '',
-    company: '',
-    email: '',
-    phone: '',
-    serviceType: '',
-    description: '',
-    budget: '',
-    timeline: ''
-  });
-  const [formSubmitted, setFormSubmitted] = useState(false);
+  const [, setShowProposalForm] = useState(false);
   const iconMap = {
     FileText, Building2, Code, Palette, Zap, CheckSquare, Printer, Camera, Search, Mail, Briefcase
   };
@@ -44,6 +33,15 @@ export default function ServicesPage() {
     { name: 'SEO & Référencement', icon: Search },
     { name: 'Email Marketing', icon: Mail },
   ]);
+
+  // Initialiser depuis paramètres d'URL (cat, q)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || '');
+    const cat = params.get('cat');
+    const q = params.get('q');
+    if (cat) setSelectedCategory(cat);
+    if (q) setSearchQuery(q);
+  }, [location.search]);
 
   useEffect(() => {
     // Charger catégories depuis l'API et construire les mappings
@@ -73,45 +71,14 @@ export default function ServicesPage() {
   useEffect(() => {
     // Charger services via GET
     (async () => {
-      setLoadingServices(true);
       try {
         const rows = await servicesApi.list();
         setServices(Array.isArray(rows) ? rows : []);
       } catch (e) {
         console.error('Erreur chargement services:', e?.message || e);
-      } finally {
-        setLoadingServices(false);
       }
     })();
   }, []);
-
-
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setFormSubmitted(true);
-    setTimeout(() => {
-      setShowProposalForm(false);
-      setFormSubmitted(false);
-      setFormData({
-        name: '',
-        company: '',
-        email: '',
-        phone: '',
-        serviceType: '',
-        description: '',
-        budget: '',
-        timeline: ''
-      });
-    }, 3000);
-  };
-
 
 const getServiceIcon = (service) => {
   const iconName = categoryIconById[service.category_id];
@@ -139,8 +106,8 @@ const handleServiceClick = async (service) => {
   }
 
   // Exclut l'icône (nous recalculerons côté /card si nécessaire) et transmet le compteur mis à jour
-  const { icon, ...serviceWithoutIcon } = service;
-  const updatedService = { ...serviceWithoutIcon, review_count: nextCount };
+  const updatedService = { ...service, review_count: nextCount };
+  delete updatedService.icon;
 
   navigate('/card', {
     state: {

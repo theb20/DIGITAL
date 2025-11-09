@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import session from "../configurations/services/session.js";
 import { useNavigate, useLocation } from "react-router-dom";
+import Search from './search.jsx'
 import {
   FaSearch,
   FaShoppingCart,
@@ -74,10 +75,31 @@ const Header = () => {
   const avatarCookie = session.getAvatarUrl();
   const isLoggedIn = session.isAuthenticated();
 
+  const headerRef = useRef(null);
+
+  useEffect(() => {
+    if (!showSearch) return;
+    const handleGlobalClick = (e) => {
+      const target = e.target;
+      // Ne pas fermer si clic dans le header
+      if (headerRef.current && headerRef.current.contains(target)) return;
+      // Ne pas fermer si clic dans le dropdown de recherche (portail)
+      const inSearchPortal = target.closest && target.closest('[data-search-portal="true"]');
+      if (inSearchPortal) return;
+      setShowSearch(false);
+    };
+    document.addEventListener('mousedown', handleGlobalClick, { passive: true });
+    document.addEventListener('touchstart', handleGlobalClick, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleGlobalClick);
+      document.removeEventListener('touchstart', handleGlobalClick);
+    };
+  }, [showSearch]);
+
   return (
     <>
      {!isSignPage && !isBlogPage && !isResetPage && (
-        <header className="w-full fixed top-0 left-0 z-50 bg-transparent transition-all duration-300">
+        <header ref={headerRef} className="w-full fixed top-0 left-0 z-50 bg-transparent transition-all duration-300">
             {(() => {
   if (!Array.isArray(appSettings)) return null;
 
@@ -366,20 +388,8 @@ const Header = () => {
                           ? "scale-100 opacity-100" 
                           : "scale-95 opacity-0"
                       }`}>
-                          <FaSearch className="text-slate-400 mr-3 flex-shrink-0 text-base md:text-lg" />
-                          <input
-                            type="text"
-                            placeholder="Rechercher..."
-                            className="bg-transparent py-2 outline-none w-full text-sm md:text-base text-slate-700 placeholder:text-slate-400"
-                            autoFocus={showSearch}
-                          />
-                          <button
-                            onClick={() => setShowSearch(false)}
-                            className="ml-2 text-slate-400 hover:text-slate-700 transition-colors flex-shrink-0"
-                            aria-label="Fermer la recherche"
-                          >
-                            <FaTimes className="text-lg" />
-                          </button>
+                          
+                          <Search />
                       </div>
                     </div>
                 </div>
