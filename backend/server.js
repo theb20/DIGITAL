@@ -24,7 +24,13 @@ import profilesRoutes from "./routes/profiles.routes.js";
 import scraperRoutes from "./routes/scraper.routes.js";
 import projectsRoutes from "./routes/projects.routes.js";
 import appointmentsRoutes from "./routes/appointments.routes.js";
+import payRoutes from "./routes/pay.routes.js";
+import mailRoutes from "./routes/mail.routes.js";
+import invoicesRoutes from "./routes/invoices.routes.js";
 import { up as migrateAppointments } from "./scripts/add_appointments_table.js";
+import { up as migrateInvoices } from "./scripts/add_invoices_table.js";
+import { initRealtimeServer } from "./config/realtime.js";
+import { ensureDefaultContactSettings } from "./config/seedAppSettings.js";
 
 
 // ============================================
@@ -70,6 +76,7 @@ const allowedOrigins = [
   `http://${LOCAL_IP}:3001`,
   // Ajoutez vos domaines de production ici
   process.env.FRONTEND_URL,
+  process.env.APP_BASE_URL,
 ].filter(Boolean); // Enlève les valeurs undefined
 
 const corsOptions = {
@@ -232,6 +239,9 @@ app.use("/api/scrape", scraperRoutes);
 app.use("/api/projects", projectsRoutes);
 app.use("/api/profiles", profilesRoutes);
 app.use("/api/appointments", appointmentsRoutes);
+app.use("/api/pay", payRoutes);
+app.use("/api/mail", mailRoutes);
+app.use("/api/invoices", invoicesRoutes);
 // ============================================
 // Gestion des routes non trouvées (404)
 // ============================================
@@ -337,6 +347,24 @@ const startServer = async () => {
       console.error("⚠️  Migration appointments non exécutée:", migErr?.message || migErr);
     }
 
+    // Migration légère: assurer la table invoices
+    try {
+      console.log("🔧 Vérification/Création de la table invoices...");
+      await migrateInvoices();
+      console.log("✅ Table invoices OK");
+    } catch (migErr) {
+      console.error("⚠️  Migration invoices non exécutée:", migErr?.message || migErr);
+    }
+
+    // Seed des paramètres système (contact)
+    try {
+      console.log("🔧 Vérification/Seed des paramètres de contact...");
+      await ensureDefaultContactSettings();
+      console.log("✅ Paramètres de contact par défaut OK");
+    } catch (seedErr) {
+      console.error("⚠️  Seed app_settings échoué:", seedErr?.message || seedErr);
+    }
+
     // Démarrer le serveur
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log("\n" + "=".repeat(50));
@@ -353,6 +381,15 @@ const startServer = async () => {
 
     // Définir server dans le scope global pour gracefulShutdown
     global.server = server;
+
+    // Initialiser Socket.IO pour le temps réel
+    try {
+      const origins = allowedOrigins;
+      initRealtimeServer(server, origins);
+      console.log("🔁 Temps réel Socket.IO initialisé");
+    } catch (rtErr) {
+      console.error("⚠️  Échec initialisation temps réel:", rtErr?.message || rtErr);
+    }
 
     return server;
   } catch (error) {

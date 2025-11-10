@@ -1,5 +1,6 @@
 import * as Model from "../models/messages.model.js";
 import * as Users from "../models/users.model.js";
+import { publishEvent } from "../config/realtime.js";
 
 export const list = async (req, res, next) => {
   try {
@@ -57,6 +58,7 @@ export const create = async (req, res, next) => {
     }
 
     const created = await Model.create(payload);
+    try { publishEvent('messages.created', created); } catch {}
     res.status(201).json(created);
   } catch (e) { next(e); }
 };
@@ -78,6 +80,7 @@ export const update = async (req, res, next) => {
 
     const updated = await Model.update(Number(req.params.id), req.body);
     if (!updated) return res.status(404).json({ error: "Message not found" });
+    try { publishEvent('messages.updated', updated); } catch {}
     res.json(updated);
   } catch (e) { next(e); }
 };
@@ -98,6 +101,7 @@ export const remove = async (req, res, next) => {
     }
 
     await Model.remove(Number(req.params.id));
+    try { publishEvent('messages.removed', { id: Number(req.params.id) }); } catch {}
     res.status(204).send();
   } catch (e) { next(e); }
 };

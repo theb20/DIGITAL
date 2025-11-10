@@ -3,6 +3,9 @@ import { uploadPublicFile } from "../config/googleDrive.js";
 import { Buffer } from "buffer";
 import * as RequestsModel from "../models/devisRequests.model.js";
 import { sendQuoteResponseEmail } from "../config/mail.js";
+import crypto from "crypto";
+import { Invoices } from "../models/invoices.model.js";
+import { PaymentModel } from "../models/pay.model.js";
 
 export const list = async (req, res, next) => {
   try {
@@ -98,6 +101,40 @@ export const sendEmail = async (req, res, next) => {
     const to = String(request.email || '').trim();
     if (!to) return res.status(400).json({ error: "Recipient email is missing on request" });
 
+    // Générer un lien de paiement et enregistrer dans payments + invoices
+    const uniqueId = crypto.randomBytes(16).toString("hex");
+    const BASE_URL = process.env.APP_BASE_URL || "https://digital-company.web.app";
+    const payment_link = `${BASE_URL}/pay/${uniqueId}`;
+    try {
+      await PaymentModel.create({
+        user_id: null,
+        service_id: request.service_id || null,
+        id_devis_submissions: submission.id,
+        payment_link,
+      });
+    } catch (_) {}
+    // Créer une facture liée au devis (avec échéance auto)
+    let invoice = null;
+    try {
+      const TERMS_DAYS = Number(process.env.INVOICE_DUE_DAYS || 14);
+      const issued = new Date();
+      const dueDate = new Date(issued);
+      dueDate.setDate(dueDate.getDate() + TERMS_DAYS);
+      invoice = await Invoices.create({
+        devis_submission_id: submission.id,
+        requester_email: to,
+        client_name: request.full_name || null,
+        amount: submission.estimation_amount ?? 0,
+        status: 'en_attente',
+        issued_date: issued,
+        due_date: dueDate,
+        payment_link,
+      });
+    } catch (e) {
+      // Continuer l'envoi même si la création de facture échoue
+      console.error('[Invoices] create failed:', e?.message || e);
+    }
+
     const subject = `Votre devis Digital`;
 
     const makeSafeUrl = (url) => {
@@ -118,10 +155,13 @@ export const sendEmail = async (req, res, next) => {
       '',
       `Nous vous envoyons la réponse à votre demande de devis.`,
       `Montant estimé: ${submission.estimation_amount ?? '-'} FCFA`,
+      invoice?.issued_date ? `Date d'émission: ${invoice.issued_date}` : '',
+      invoice?.due_date ? `Échéance: ${invoice.due_date}` : '',
       submission.delivery_time ? `Délai de livraison: ${submission.delivery_time}` : '',
       '',
       submission.message ? `Message: ${submission.message}` : '',
       safePdfUrl ? `Voir le devis PDF: ${safePdfUrl}` : '',
+      payment_link ? `Payer en ligne: ${payment_link}` : '',
       '',
       `Cordialement,`,
       `Digital`
@@ -235,12 +275,16 @@ export const sendEmail = async (req, res, next) => {
             <span>💰 Montant estimé</span>
             <span class="info-value">${submission.estimation_amount ?? '-'} FCFA</span>
           </div>
+          ${invoice?.issued_date ? `<div class="info-row"><span>📅 Date d'émission</span><span class="info-value">${new Date(invoice.issued_date).toISOString().slice(0,10)}</span></div>` : ''}
+          ${invoice?.due_date ? `<div class="info-row"><span>⏳ Échéance</span><span class="info-value">${new Date(invoice.due_date).toISOString().slice(0,10)}</span></div>` : ''}
           ${submission.delivery_time ? `<div class="info-row"><span>⏱️ Délai de livraison</span><span class="info-value">${submission.delivery_time}</span></div>` : ''}
         </div>
 
         ${submission.message ? `<div class="message-box"><p class="title">📝 Message personnalisé</p><p class="content">${String(submission.message).replace(/\n/g,'<br/>')}</p></div>` : ''}
 
         ${safePdfUrl ? `<a href="${safePdfUrl}" class="btn-download" target="_blank" rel="noopener">📄 Télécharger le devis (PDF)</a>` : ''}
+
+        ${payment_link ? `<a href="${payment_link}" class="btn-download" target="_blank" rel="noopener" style="background:linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%); box-shadow:0 4px 12px rgba(37,99,235,0.35)">💳 Payer maintenant</a>` : ''}
 
         <p>Nous restons à votre disposition pour toute question.</p>
         <p>Cordialement,<br/><strong style="color:#60a5fa;">L'équipe Digital</strong></p>
@@ -264,6 +308,10 @@ export const sendEmail = async (req, res, next) => {
     `;
 
     const info = await sendQuoteResponseEmail({ to, subject, text: plainText, html });
-    res.json({ success: true, messageId: info.messageId });
+    // Marquer la facture comme envoyée après l'email
+    if (invoice?.id) {
+      try { invoice = await Invoices.markSent(invoice.id, payment_link, new Date()); } catch {}
+    }
+    res.json({ success: true, messageId: info.messageId, invoice });
   } catch (e) { next(e); }
 };

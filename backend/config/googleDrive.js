@@ -66,10 +66,10 @@ export function getDriveClient() {
   return { drive, auth };
 }
 
-export async function uploadPublicFile({ name, mimeType, buffer }) {
+export async function uploadPublicFile({ name, mimeType, buffer, folderId: overrideFolderId }) {
   const { drive } = getDriveClient();
   const media = { mimeType, body: Readable.from(buffer) };
-  const folderId = normalizeFolderId(GOOGLE_DRIVE_FOLDER_ID);
+  const folderId = normalizeFolderId(overrideFolderId || GOOGLE_DRIVE_FOLDER_ID);
   const requestBody = { name, mimeType, parents: [folderId] };
 
   const { data } = await drive.files.create({

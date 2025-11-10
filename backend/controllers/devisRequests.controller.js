@@ -1,5 +1,7 @@
 import * as Model from "../models/devisRequests.model.js";
 import { uploadPublicFile } from "../config/googleDrive.js";
+import { notifySupportAboutQuoteRequest, sendQuoteRequestAcknowledgement } from "../config/mail.js";
+import { publishEvent } from "../config/realtime.js";
 import { Buffer } from "buffer";
 
 export const list = async (req, res, next) => {
@@ -20,6 +22,21 @@ export const get = async (req, res, next) => {
 export const create = async (req, res, next) => {
   try {
     const created = await Model.create(req.body);
+    // Temps réel: notifier création
+    try { publishEvent('devisRequests.created', created); } catch {}
+    const { full_name, email, phone = null, project_type = null, project_description = '' } = req.body || {};
+    // Envoi des emails (non bloquant)
+    notifySupportAboutQuoteRequest({
+      fullName: full_name,
+      email,
+      phone,
+      projectType: project_type,
+      description: project_description,
+    }).catch((err) => console.error('[MAIL] Erreur notification devis support:', err));
+    if (email) {
+      sendQuoteRequestAcknowledgement({ to: email, fullName: full_name })
+        .catch((err) => console.error('[MAIL] Erreur envoi accusé devis:', err));
+    }
     res.status(201).json(created);
   } catch (e) { next(e); }
 };
@@ -72,7 +89,20 @@ export const createWithFile = async (req, res, next) => {
       attachment_url,
       status: "reçu"
     });
-
+    // Temps réel: notifier création
+    try { publishEvent('devisRequests.created', created); } catch {}
+    // Envoi des emails (non bloquant)
+    notifySupportAboutQuoteRequest({
+      fullName: full_name,
+      email,
+      phone,
+      projectType: project_type,
+      description: project_description,
+    }).catch((err) => console.error('[MAIL] Erreur notification devis support:', err));
+    if (email) {
+      sendQuoteRequestAcknowledgement({ to: email, fullName: full_name })
+        .catch((err) => console.error('[MAIL] Erreur envoi accusé devis:', err));
+    }
     res.status(201).json(created);
   } catch (e) { next(e); }
 };

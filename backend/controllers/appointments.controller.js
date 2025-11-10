@@ -1,6 +1,7 @@
 import * as Model from "../models/appointments.model.js";
 import * as Services from "../models/services.model.js";
 import { sendQuoteResponseEmail } from "../config/mail.js";
+import { publishEvent } from "../config/realtime.js";
 
 export const list = async (req, res, next) => {
   try {
@@ -20,6 +21,8 @@ export const get = async (req, res, next) => {
 export const create = async (req, res, next) => {
   try {
     const created = await Model.create(req.body);
+    // Temps réel: notifier création rendez-vous
+    try { publishEvent('appointments.created', created); } catch {}
     res.status(201).json(created);
   } catch (e) { next(e); }
 };
@@ -30,6 +33,8 @@ export const update = async (req, res, next) => {
     const before = await Model.findById(id);
     const updated = await Model.update(id, req.body);
     if (!updated) return res.status(404).json({ error: "Appointment not found" });
+    // Temps réel: notifier mise à jour rendez-vous
+    try { publishEvent('appointments.updated', updated); } catch {}
     // Si le statut a changé, notifier le client par email avec un récapitulatif
     try {
       const prevStatus = before?.status || null;
@@ -109,6 +114,8 @@ export const update = async (req, res, next) => {
 export const remove = async (req, res, next) => {
   try {
     await Model.remove(Number(req.params.id));
+    // Temps réel: notifier suppression rendez-vous
+    try { publishEvent('appointments.removed', { id: Number(req.params.id) }); } catch {}
     res.status(204).send();
   } catch (e) { next(e); }
 };
