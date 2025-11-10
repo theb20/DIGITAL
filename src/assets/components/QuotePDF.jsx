@@ -116,6 +116,16 @@ const QuotePDF = ({ quoteData, request }) => {
   const companyPhones = asArray(company?.phones || company?.phone);
   const companyCountries = asArray(companyCountry || company?.countries || quoteData?.companyCountries);
 
+  const invoiceDue = (() => {
+    try {
+      const base = createdAt ? new Date(createdAt) : null;
+      if (!base) return null;
+      const d = new Date(base);
+      d.setDate(d.getDate() + Number(import.meta?.env?.VITE_INVOICE_DUE_DAYS || 14));
+      return d;
+    } catch { return null; }
+  })();
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -138,6 +148,7 @@ const QuotePDF = ({ quoteData, request }) => {
             <Text style={[styles.right, styles.small]}>N° {reference}</Text>
             {createdAt && <Text style={[styles.right, styles.small]}>Date: {formatDateFR(createdAt)}</Text>}
             {validity && <Text style={[styles.right, styles.small]}>Validité: {formatDateFR(validity)}</Text>}
+            {invoiceDue && <Text style={[styles.right, styles.small]}>Échéance facture: {formatDateFR(invoiceDue)}</Text>}
           </View>
         </View>
 

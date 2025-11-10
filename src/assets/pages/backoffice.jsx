@@ -8,6 +8,7 @@ import devisRequestsApi from '../configurations/services/devisRequests.js';
 import messagesApi from '../configurations/messages/messages.js';
 import usersApi from '../configurations/services/user.js';
 import promosApi from '../configurations/services/promos.js';
+import payApi from '../configurations/services/pay.js';
 import appSettingsApi from '../configurations/services/appSettings.js';
 import blogsApi from '../configurations/services/blogs.js';
 import projectsApi from '../configurations/services/projects.js';
@@ -16,7 +17,10 @@ import api from '../configurations/api/api_axios.js';
 import session from '../configurations/services/session.js';
 import QuoteComponent from '../components/quote.jsx';
 import appointmentsApi from '../configurations/services/appointments.js';
+import invoicesApi from '../configurations/services/invoices.js';
 import notificationsApi from '../configurations/services/notifications.js';
+import contactApi from '../configurations/services/contact.js';
+import { connectRealtime } from '../configurations/realtime.js';
 
 const BackofficeDigital = () => {
   const [activeMenu, setActiveMenu] = useState('dashboard');
@@ -63,6 +67,321 @@ const BackofficeDigital = () => {
   };
   const [dateRange, setDateRange] = useState('30days');
   const [activeTab, setActiveTab] = useState("Profil");
+
+  // Sidebar droite (panneau sortant)
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
+  const openRightSidebar = () => setRightSidebarOpen(true);
+  const closeRightSidebar = () => setRightSidebarOpen(false);
+
+  // Filtres cachés (Contacts)
+  const [filtersOpen, setFiltersOpen] = useState(false);
+ const [contactFilters, setContactFilters] = useState({ q: '', email: '', subject: '', dateFrom: '', dateTo: '' });
+ const resetContactFilters = () => setContactFilters({ q: '', email: '', subject: '', dateFrom: '', dateTo: '' });
+ // Filtrage global côté client, basé sur contactFilters
+ const applyGlobalFilters = (rows) => {
+   const list = Array.isArray(rows) ? rows.slice() : [];
+   const { q, email, subject, dateFrom, dateTo } = contactFilters || {};
+   const qNorm = q ? String(q).toLowerCase() : '';
+   const emailNorm = email ? String(email).toLowerCase() : '';
+   const subjectNorm = subject ? String(subject).toLowerCase() : '';
+   return list.filter(item => {
+     // Recherche libre sur champs fréquents
+     if (qNorm) {
+       const hay = [
+         item.full_name, item.first_name, item.last_name, item.name, item.nom, item.client, item.contact,
+         item.title, item.project_type, item.subject, item.message, item.body,
+         item.email, item.sender_email, item.recipient_email, item.phone, item.role, item.position,
+       ].map(v => String(v || '').toLowerCase());
+       const matchesQ = hay.some(v => v.includes(qNorm));
+       if (!matchesQ) return false;
+     }
+     // Email sur divers alias
+     if (emailNorm) {
+       const emails = [
+         item.email, item.client_email, item.sender_email, item.recipient_email,
+         item?.contact?.email,
+       ].map(v => String(v || '').toLowerCase());
+       const matchesEmail = emails.some(v => v.includes(emailNorm));
+       if (!matchesEmail) return false;
+     }
+     // Sujet: alias subject/title/project_type
+     if (subjectNorm) {
+       const subs = [item.subject, item.title, item.project_type].map(v => String(v || '').toLowerCase());
+       const matchesSubject = subs.some(v => v.includes(subjectNorm));
+       if (!matchesSubject) return false;
+     }
+     // Dates: utilise le premier champ date trouvable
+     if (dateFrom || dateTo) {
+       const dateStr = item.created_at || item.appointment_date || item.deadline || item.date;
+       const ts = dateStr ? new Date(dateStr) : null;
+       if (!ts || Number.isNaN(ts.getTime())) return false;
+       const fromOk = dateFrom ? ts >= new Date(dateFrom + (String(dateFrom).includes('T') ? '' : 'T00:00:00')) : true;
+       const toOk = dateTo ? ts <= new Date(dateTo + (String(dateTo).includes('T') ? '' : 'T23:59:59')) : true;
+       if (!(fromOk && toOk)) return false;
+     }
+     return true;
+   });
+ };
+
+  // Contacts (CRUD simple)
+  const [contacts, setContacts] = useState([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [contactsError, setContactsError] = useState(null);
+
+  // Réponse aux contacts (email)
+  const [contactReplyOpen, setContactReplyOpen] = useState(false);
+  const [contactReplySending, setContactReplySending] = useState(false);
+  const [contactReplyError, setContactReplyError] = useState(null);
+  const [contactReplyData, setContactReplyData] = useState({ id: null, email: '', subject: '', message: '' });
+
+  // Voir message de contact (modale lecture)
+  const [contactViewOpen, setContactViewOpen] = useState(false);
+  const [contactViewData, setContactViewData] = useState(null);
+  const openViewContact = (c) => {
+    setContactViewData(c || null);
+    setContactViewOpen(true);
+  };
+
+  const openReplyContact = (c) => {
+    setContactReplyData({
+      id: c?.id || null,
+      email: c?.email || '',
+      subject: c?.subject ? `Re: ${c.subject}` : 'Réponse à votre message',
+      message: '',
+    });
+    setContactReplyError(null);
+    setContactReplyOpen(true);
+  };
+
+  const sendContactReply = async () => {
+    try {
+      setContactReplySending(true);
+      setContactReplyError(null);
+      if (!contactReplyData.id) throw new Error('Message introuvable');
+      const payload = {
+        subject: contactReplyData.subject || undefined,
+        text: contactReplyData.message || undefined,
+      };
+      await contactApi.reply(contactReplyData.id, payload);
+      alert('Réponse envoyée par email');
+      setContactReplyOpen(false);
+    } catch (e) {
+      setContactReplyError(e?.message || 'Envoi de la réponse échoué');
+    } finally {
+      setContactReplySending(false);
+    }
+  };
+
+  const loadContacts = async () => {
+    try {
+      setContactsLoading(true);
+      const rows = await contactApi.list();
+      setContacts(Array.isArray(rows) ? rows : []);
+      setContactsError(null);
+    } catch (e) {
+      setContacts([]);
+      setContactsError(e?.message || 'Erreur chargement contacts');
+    } finally {
+      setContactsLoading(false);
+    }
+  };
+
+  const deleteContact = async (id) => {
+    if (!id) return;
+    if (!confirm('Supprimer ce message de contact ?')) return;
+    try {
+      await contactApi.remove(id);
+      await loadContacts();
+    } catch (e) {
+      alert(e?.message || 'Suppression échouée');
+    }
+  };
+
+  // === Users CRUD ===
+  const [usersTable, setUsersTable] = useState([]);
+  const [usersTableLoading, setUsersTableLoading] = useState(false);
+  const [usersTableError, setUsersTableError] = useState(null);
+  const [userFormOpen, setUserFormOpen] = useState(false);
+  const [userFormMode, setUserFormMode] = useState('create'); // 'create' | 'edit'
+  const [userFormData, setUserFormData] = useState({ id: null, first_name: '', last_name: '', email: '', role: 'user', position: '', is_active: true });
+
+  const loadUsersTable = async () => {
+    try {
+      setUsersTableLoading(true);
+      const rows = await usersApi.list();
+      setUsersTable(Array.isArray(rows) ? rows : []);
+      setUsersTableError(null);
+    } catch (e) {
+      setUsersTable([]);
+      setUsersTableError(e?.message || 'Erreur chargement utilisateurs');
+    } finally {
+      setUsersTableLoading(false);
+    }
+  };
+
+  const openCreateUser = () => {
+    setUserFormMode('create');
+    setUserFormData({ id: null, first_name: '', last_name: '', email: '', role: 'user', position: '', is_active: true });
+    setUserFormOpen(true);
+  };
+
+  const openEditUser = (u) => {
+    setUserFormMode('edit');
+    setUserFormData({
+      id: u?.id || null,
+      first_name: u?.first_name || '',
+      last_name: u?.last_name || '',
+      email: u?.email || '',
+      role: u?.role || 'user',
+      position: u?.position || '',
+      is_active: Boolean(u?.is_active ?? true),
+    });
+    setUserFormOpen(true);
+  };
+
+  const saveUser = async () => {
+    try {
+      const payload = {
+        first_name: userFormData.first_name || undefined,
+        last_name: userFormData.last_name || undefined,
+        email: userFormData.email || undefined,
+        role: userFormData.role || undefined,
+        position: userFormData.position || undefined,
+        is_active: userFormData.is_active,
+      };
+      let saved = null;
+      if (userFormMode === 'edit' && userFormData.id) {
+        saved = await usersApi.update(userFormData.id, payload);
+        setUsersTable(prev => prev.map(u => u.id === saved.id ? saved : u));
+      } else {
+        saved = await usersApi.create(payload);
+        setUsersTable(prev => [saved, ...prev]);
+      }
+      setUserFormOpen(false);
+    } catch (e) {
+      alert(e?.message || 'Échec de la sauvegarde');
+    }
+  };
+
+  const deleteUserRow = async (id) => {
+    if (!id) return;
+    if (!confirm('Supprimer cet utilisateur ?')) return;
+    try {
+      await usersApi.remove(id);
+      setUsersTable(prev => prev.filter(u => u.id !== id));
+    } catch (e) {
+      alert(e?.message || 'Erreur lors de la suppression');
+    }
+  };
+
+  const renderUsers = () => {
+    const rows = applyGlobalFilters(usersTable);
+    return (
+      <div className="flex-1 overflow-y-auto">
+        <div className="px-6 py-4 border-b bg-white">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">Utilisateurs</h2>
+            <button onClick={openCreateUser} className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+              <Plus className="w-4 h-4 mr-1" /> Ajouter
+            </button>
+          </div>
+          {usersTableError && <div className="mt-2 text-sm text-red-600">{usersTableError}</div>}
+        </div>
+        <div className="p-6">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-100 text-gray-700">
+                <th className="px-3 py-2 text-left">Prénom</th>
+                <th className="px-3 py-2 text-left">Nom</th>
+                <th className="px-3 py-2 text-left">Email</th>
+                <th className="px-3 py-2 text-left">Rôle</th>
+                <th className="px-3 py-2 text-left">Poste</th>
+                <th className="px-3 py-2 text-left">Actif</th>
+                <th className="px-3 py-2 text-left">Session</th>
+                <th className="px-3 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usersTableLoading ? (
+                <tr><td className="px-3 py-2" colSpan={8}>Chargement...</td></tr>
+              ) : Array.isArray(rows) && rows.length > 0 ? (
+                rows.map((u) => (
+                  <tr key={u.id} className="border-t">
+                    <td className="px-3 py-2">{u.first_name || '—'}</td>
+                    <td className="px-3 py-2">{u.last_name || '—'}</td>
+                    <td className="px-3 py-2">{u.email || '—'}</td>
+                    <td className="px-3 py-2">{u.role || '—'}</td>
+                    <td className="px-3 py-2">{u.position || '—'}</td>
+                    <td className="px-3 py-2">{String(u.is_active ? 'Oui' : 'Non')}</td>
+                    <td className="px-3 py-2">{u.session_status || '—'}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button onClick={() => openEditUser(u)} className="inline-flex items-center px-2 py-1 text-indigo-600 hover:text-indigo-800 mr-2">
+                        <Edit className="w-4 h-4 mr-1" /> Éditer
+                      </button>
+                      <button onClick={() => deleteUserRow(u.id)} className="inline-flex items-center px-2 py-1 text-red-600 hover:text-red-800">
+                        <Trash2 className="w-4 h-4 mr-1" /> Supprimer
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr><td className="px-3 py-2" colSpan={8}>Aucun utilisateur</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {userFormOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setUserFormOpen(false)} />
+            <div className="relative bg-white rounded-xl shadow-xl p-6 w-[92%] max-w-xl">
+              <h4 className="text-lg font-semibold mb-4">{userFormMode === 'edit' ? 'Modifier l\'utilisateur' : 'Ajouter un utilisateur'}</h4>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Prénom</label>
+                    <input type="text" value={userFormData.first_name} onChange={(e)=>setUserFormData(d=>({ ...d, first_name: e.target.value }))} className="w-full border rounded px-3 py-2" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Nom</label>
+                    <input type="text" value={userFormData.last_name} onChange={(e)=>setUserFormData(d=>({ ...d, last_name: e.target.value }))} className="w-full border rounded px-3 py-2" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Email</label>
+                  <input type="email" value={userFormData.email} onChange={(e)=>setUserFormData(d=>({ ...d, email: e.target.value }))} className="w-full border rounded px-3 py-2" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Rôle</label>
+                    <select value={userFormData.role} onChange={(e)=>setUserFormData(d=>({ ...d, role: e.target.value }))} className="w-full border rounded px-3 py-2">
+                      <option value="user">user</option>
+                      <option value="manager">manager</option>
+                      <option value="admin">admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Poste</label>
+                    <input type="text" value={userFormData.position} onChange={(e)=>setUserFormData(d=>({ ...d, position: e.target.value }))} className="w-full border rounded px-3 py-2" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input id="user-active" type="checkbox" checked={userFormData.is_active} onChange={(e)=>setUserFormData(d=>({ ...d, is_active: e.target.checked }))} />
+                  <label htmlFor="user-active" className="text-sm text-gray-600">Compte actif</label>
+                </div>
+              </div>
+              <div className="mt-6 flex items-center justify-end gap-2">
+                <button onClick={() => setUserFormOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded">Annuler</button>
+                <button onClick={saveUser} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded inline-flex items-center">
+                  <Save className="w-4 h-4 mr-1" /> Enregistrer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Notifications (dernières soumissions devis)
   const [notifications, setNotifications] = useState([]);
@@ -830,6 +1149,58 @@ const BackofficeDigital = () => {
     setDevisDrawerRequest(null);
   };
 
+  // Connexion temps réel Socket.IO et abonnements
+  useEffect(() => {
+    const socket = connectRealtime();
+    const onDevisCreated = (item) => setDevisRequests(prev => [item, ...(Array.isArray(prev) ? prev : [])]);
+    const onDevisUpdated = (item) => setDevisRequests(prev => (Array.isArray(prev) ? prev.map(d => d?.id === item?.id ? item : d) : [item]));
+    const onContactCreated = (item) => setContacts(prev => [item, ...(Array.isArray(prev) ? prev : [])]);
+    const onContactRemoved = ({ id }) => setContacts(prev => (Array.isArray(prev) ? prev.filter(c => c?.id !== id) : []));
+    const onApptCreated = (item) => setAppointments(prev => [item, ...(Array.isArray(prev) ? prev : [])]);
+    const onApptUpdated = (item) => setAppointments(prev => (Array.isArray(prev) ? prev.map(a => a?.id === item?.id ? item : a) : [item]));
+    const onApptRemoved = ({ id }) => setAppointments(prev => (Array.isArray(prev) ? prev.filter(a => a?.id !== id) : []));
+    const onMsgCreated = (item) => setMessages(prev => [item, ...(Array.isArray(prev) ? prev : [])]);
+    const onMsgUpdated = (item) => setMessages(prev => (Array.isArray(prev) ? prev.map(m => m?.id === item?.id ? item : m) : [item]));
+    const onMsgRemoved = ({ id }) => setMessages(prev => (Array.isArray(prev) ? prev.filter(m => m?.id !== id) : []));
+
+    // Événements temps réel pour les factures
+    const onInvoiceCreated = (item) => setInvoices(prev => [item, ...(Array.isArray(prev) ? prev : [])]);
+    const onInvoiceUpdated = (item) => setInvoices(prev => (Array.isArray(prev) ? prev.map(x => x?.id === item?.id ? item : x) : [item]));
+    const onInvoiceRemoved = ({ id }) => setInvoices(prev => (Array.isArray(prev) ? prev.filter(x => x?.id !== id) : []));
+
+    socket.on('devisRequests.created', onDevisCreated);
+    socket.on('devisRequests.updated', onDevisUpdated);
+    socket.on('contacts.created', onContactCreated);
+    socket.on('contacts.removed', onContactRemoved);
+    socket.on('appointments.created', onApptCreated);
+    socket.on('appointments.updated', onApptUpdated);
+    socket.on('appointments.removed', onApptRemoved);
+    socket.on('messages.created', onMsgCreated);
+    socket.on('messages.updated', onMsgUpdated);
+    socket.on('messages.removed', onMsgRemoved);
+    socket.on('invoices.created', onInvoiceCreated);
+    socket.on('invoices.updated', onInvoiceUpdated);
+    socket.on('invoices.removed', onInvoiceRemoved);
+    socket.on('invoices.sent', onInvoiceUpdated);
+
+    return () => {
+      socket.off('devisRequests.created', onDevisCreated);
+      socket.off('devisRequests.updated', onDevisUpdated);
+      socket.off('contacts.created', onContactCreated);
+      socket.off('contacts.removed', onContactRemoved);
+      socket.off('appointments.created', onApptCreated);
+      socket.off('appointments.updated', onApptUpdated);
+      socket.off('appointments.removed', onApptRemoved);
+      socket.off('messages.created', onMsgCreated);
+      socket.off('messages.updated', onMsgUpdated);
+      socket.off('messages.removed', onMsgRemoved);
+      socket.off('invoices.created', onInvoiceCreated);
+      socket.off('invoices.updated', onInvoiceUpdated);
+      socket.off('invoices.removed', onInvoiceRemoved);
+      socket.off('invoices.sent', onInvoiceUpdated);
+    };
+  }, []);
+
   // Données Analytics
   const revenueData = [
     { month: 'Jan', revenus: 45000, depenses: 28000, profit: 17000 },
@@ -840,6 +1211,46 @@ const BackofficeDigital = () => {
     { month: 'Jun', revenus: 67000, depenses: 38000, profit: 29000 },
     { month: 'Jul', revenus: 72000, depenses: 41000, profit: 31000 },
   ];
+
+  // Calcul des cartes Finance à partir des factures
+  const computeFinanceStats = (list) => {
+    const arr = Array.isArray(list) ? list : [];
+    const now = new Date();
+    const thisYear = now.getFullYear();
+    const lastYear = thisYear - 1;
+
+    const normalizeStatus = (s) => String(s || '').toLowerCase();
+    const isPaid = (inv) => normalizeStatus(inv?.status) === 'payée' || normalizeStatus(inv?.status) === 'paid';
+    const isRefused = (inv) => normalizeStatus(inv?.status) === 'refusée' || normalizeStatus(inv?.status) === 'refused';
+    const isUnpaid = (inv) => !isPaid(inv) && !isRefused(inv);
+
+    const amountOf = (x) => {
+      const n = typeof x?.amount === 'number' ? x.amount : parseFloat(String(x?.amount || '0').replace(',', '.'));
+      return isNaN(n) ? 0 : n;
+    };
+    const yearOf = (x) => {
+      const d = x?.issued_date ? new Date(x.issued_date) : null;
+      return d && !isNaN(d.getTime()) ? d.getFullYear() : null;
+    };
+    const isOverdue = (x) => {
+      if (!isUnpaid(x)) return false;
+      const d = x?.due_date ? new Date(x.due_date) : null;
+      if (!d || isNaN(d.getTime())) return false;
+      return d < now;
+    };
+
+    const totalRevenue = arr.filter(isPaid).reduce((sum, x) => sum + amountOf(x), 0);
+    const unpaidList = arr.filter(isUnpaid);
+    const pendingAmount = unpaidList.reduce((sum, x) => sum + amountOf(x), 0);
+    const unpaidCount = unpaidList.length;
+    const overdueAmount = unpaidList.filter(isOverdue).reduce((sum, x) => sum + amountOf(x), 0);
+
+    const thisYearRevenue = arr.filter(x => isPaid(x) && yearOf(x) === thisYear).reduce((s, x) => s + amountOf(x), 0);
+    const lastYearRevenue = arr.filter(x => isPaid(x) && yearOf(x) === lastYear).reduce((s, x) => s + amountOf(x), 0);
+    const yoyDeltaPct = lastYearRevenue > 0 ? ((thisYearRevenue - lastYearRevenue) / lastYearRevenue) * 100 : null;
+
+    return { totalRevenue, pendingAmount, unpaidCount, overdueAmount, yoyDeltaPct };
+  };
 
   const trafficData = [
     { day: 'Lun', visitors: 1240, pageviews: 3420, conversions: 45 },
@@ -1000,14 +1411,159 @@ const BackofficeDigital = () => {
 
   useEffect(() => { loadTeamMembers(); }, []);
 
+  // Paiements (Finance)
+  const [paymentsTable, setPaymentsTable] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState('');
+  const [paymentFormOpen, setPaymentFormOpen] = useState(false);
+  const [paymentFormMode, setPaymentFormMode] = useState('create');
+  const [paymentFormData, setPaymentFormData] = useState({ id: null, user_id: '', service_id: '', id_devis_submissions: '', payment: false, payment_link: '' });
 
-  const invoices = [
-    { id: '#INV-2025-089', client: 'TechStore France', montant: '12,500 €', statut: 'Payée', date: '2025-11-01', echeance: '2025-11-15' },
-    { id: '#INV-2025-088', client: 'FitLife App', montant: '8,750 €', statut: 'En attente', date: '2025-10-28', echeance: '2025-11-12' },
-    { id: '#INV-2025-087', client: 'DataViz Corp', montant: '15,200 €', statut: 'Payée', date: '2025-10-25', echeance: '2025-11-09' },
-    { id: '#INV-2025-086', client: 'BioMarket', montant: '6,300 €', statut: 'En retard', date: '2025-10-15', echeance: '2025-10-30' },
-    { id: '#INV-2025-085', client: 'SalesForce Pro', montant: '19,800 €', statut: 'Payée', date: '2025-10-10', echeance: '2025-10-25' },
-  ];
+  const loadPaymentsTable = async () => {
+    try {
+      setPaymentsLoading(true);
+      setPaymentsError('');
+      const rows = await payApi.list();
+      setPaymentsTable(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      setPaymentsError(e?.message || 'Erreur chargement des paiements');
+    } finally {
+      setPaymentsLoading(false);
+    }
+  };
+
+  const openCreatePayment = () => {
+    setPaymentFormMode('create');
+    setPaymentFormData({ id: null, user_id: '', service_id: '', id_devis_submissions: '', payment: false, payment_link: '' });
+    setPaymentFormOpen(true);
+  };
+
+  const openEditPayment = (p) => {
+    setPaymentFormMode('edit');
+    setPaymentFormData({
+      id: p?.id,
+      user_id: p?.user_id ?? '',
+      service_id: p?.service_id ?? '',
+      id_devis_submissions: p?.id_devis_submissions ?? '',
+      payment: !!p?.payment,
+      payment_link: p?.payment_link ?? ''
+    });
+    setPaymentFormOpen(true);
+  };
+
+  const savePayment = async () => {
+    try {
+      const payload = {
+        user_id: paymentFormData.user_id ? Number(paymentFormData.user_id) : undefined,
+        service_id: paymentFormData.service_id ? Number(paymentFormData.service_id) : null,
+        id_devis_submissions: paymentFormData.id_devis_submissions ? Number(paymentFormData.id_devis_submissions) : null,
+        payment: !!paymentFormData.payment,
+        payment_link: paymentFormData.payment_link || undefined,
+      };
+      if (!payload.service_id && !payload.id_devis_submissions) {
+        alert('Renseignez soit Service ID, soit Devis Submission ID');
+        return;
+      }
+      if (paymentFormMode === 'edit' && paymentFormData.id) {
+        const updated = await payApi.update(paymentFormData.id, payload);
+        setPaymentsTable(prev => prev.map(x => x.id === updated.id ? updated : x));
+      } else {
+        const created = await payApi.createPayment(payload);
+        const full = await payApi.get(created.id);
+        setPaymentsTable(prev => [full, ...prev]);
+      }
+      setPaymentFormOpen(false);
+    } catch (e) {
+      alert(e?.message || 'Échec de la sauvegarde du paiement');
+    }
+  };
+
+  const deletePaymentRow = async (id) => {
+    if (!id) return;
+    if (!confirm('Supprimer ce paiement ?')) return;
+    try {
+      await payApi.remove(id);
+      setPaymentsTable(prev => prev.filter(x => x.id !== id));
+    } catch (e) {
+      alert(e?.message || 'Erreur lors de la suppression du paiement');
+    }
+  };
+
+
+  // Factures (backend)
+  const [invoices, setInvoices] = useState([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
+  const [invoiceError, setInvoiceError] = useState(null);
+  const [invoiceFilters, setInvoiceFilters] = useState({
+    query: '',
+    status: '',
+    issuedFrom: '',
+    issuedTo: '',
+    dueFrom: '',
+    dueTo: '',
+    minAmount: '',
+    maxAmount: ''
+  });
+
+  const loadInvoices = async () => {
+    setLoadingInvoices(true); setInvoiceError(null);
+    try {
+      const rows = await invoicesApi.list();
+      setInvoices(Array.isArray(rows) ? rows : []);
+    } catch (e) {
+      setInvoiceError(e?.message || 'Échec de chargement des factures');
+    } finally { setLoadingInvoices(false); }
+  };
+
+  const sendInvoiceEmail = async (id) => {
+    try {
+      const res = await invoicesApi.sendEmail(id);
+      const updated = res?.invoice || null;
+      if (updated) setInvoices(prev => prev.map(x => x.id === updated.id ? updated : x));
+    } catch (e) {
+      alert(e?.message || 'Échec de l’envoi de la facture');
+    }
+  };
+
+  const setInvoiceStatus = async (id, status) => {
+    try {
+      const updated = await invoicesApi.setStatus(id, status);
+      setInvoices(prev => prev.map(x => x.id === updated.id ? updated : x));
+    } catch (e) {
+      alert(e?.message || 'Échec de la mise à jour du statut');
+    }
+  };
+
+  const deleteInvoice = async (id) => {
+    if (!isAdmin) return;
+    if (!id) return;
+    if (!confirm('Supprimer cette facture ?')) return;
+    try {
+      await invoicesApi.remove(id);
+      setInvoices(prev => prev.filter(x => x.id !== id));
+    } catch (e) {
+      alert(e?.message || 'Erreur lors de la suppression de la facture');
+    }
+  };
+
+  // Helpers affichage factures
+  const formatEuro = (n) => {
+    const num = typeof n === 'number' ? n : Number(n);
+    return Number.isFinite(num) ? num.toLocaleString('fr-FR', { style: 'currency', currency: 'XOF' }) : (n ?? '—');
+  };
+  const fmtDate = (s) => {
+    if (!s) return '—';
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? String(s) : d.toISOString().slice(0,10);
+  };
+  const labelStatus = (s) => {
+    const m = String(s || '').toLowerCase();
+    if (m === 'payee' || m === 'payée') return 'Payée';
+    if (m === 'refusee' || m === 'refusée') return 'Refusée';
+    if (m === 'envoyee' || m === 'envoyée' || m === 'sent') return 'Envoyée';
+    if (m === 'en_attente' || m === 'pending') return 'En attente';
+    return s || '—';
+  };
 
   // Catégories de services (backend)
   const [serviceCategories, setServiceCategories] = useState([]);
@@ -1526,11 +2082,13 @@ const BackofficeDigital = () => {
 
   const navigate = useNavigate();
   const location = useLocation();
-  const menuItems = [
+ const menuItems = [
     { id: 'dashboard', name: 'Tableau de bord', icon: Home, path: '/backoffice/dashboard' },
     { id: 'projects', name: 'Services', icon: Package, path: '/backoffice/services' },
     { id: 'devis', name: 'Suivi devis', icon: FileText, path: '/backoffice/devis' },
     { id: 'appointments', name: 'Rendez-vous', icon: Calendar, path: '/backoffice/appointments' },
+    { id: 'contacts', name: 'Contacts', icon: Phone, path: '/backoffice/contacts' },
+    { id: 'users', name: 'Utilisateurs', icon: Users, path: '/backoffice/users' },
     { id: 'settings', name: 'Paramètres', icon: Settings, path: '/backoffice/parametre' },
     { id: 'messages', name: 'Messagerie', icon: Mail, path: '/backoffice/messages' },
     { id: 'clients', name: 'Clients', icon: Users, path: '/backoffice/clients' },
@@ -1545,6 +2103,8 @@ const BackofficeDigital = () => {
     if (p.includes('/backoffice/services')) setActiveMenu('projects');
     else if (p.includes('/backoffice/devis')) setActiveMenu('devis');
     else if (p.includes('/backoffice/appointments')) setActiveMenu('appointments');
+    else if (p.includes('/backoffice/contacts')) setActiveMenu('contacts');
+    else if (p.includes('/backoffice/users')) setActiveMenu('users');
     else if (p.includes('/backoffice/parametre')) setActiveMenu('settings');
     else if (p.includes('/backoffice/messages')) setActiveMenu('messages');
     else if (p.includes('/backoffice/clients')) setActiveMenu('clients');
@@ -1567,9 +2127,11 @@ const BackofficeDigital = () => {
       'Terminé': 'bg-green-100 text-green-800',
       'En révision': 'bg-yellow-100 text-yellow-800',
       'Planifié': 'bg-purple-100 text-purple-800',
-      'Payée': 'bg-green-100 text-green-800',
+      'Payée': 'bg-green-100 text-green-800', 'payée': 'bg-green-100 text-green-800',
       'No client': 'bg-blue-100 text-blue-800',
-      'En attente': 'bg-yellow-100 text-yellow-800',
+      'En attente': 'bg-yellow-100 text-yellow-800', 'en_attente': 'bg-yellow-100 text-yellow-800',
+      'Envoyée': 'bg-blue-100 text-blue-800', 'envoyée': 'bg-blue-100 text-blue-800',
+      'Refusée': 'bg-red-100 text-red-800', 'refusée': 'bg-red-100 text-red-800',
       'En retard': 'bg-red-100 text-red-800',
     };
     return colors[statut] || 'bg-gray-100 text-gray-800';
@@ -1651,7 +2213,10 @@ const BackofficeDigital = () => {
     }
   };
 
-  useEffect(() => { if (activeMenu === 'messages') loadMessages(); }, [activeMenu]);
+useEffect(() => { if (activeMenu === 'messages') loadMessages(); }, [activeMenu]);
+useEffect(() => { if (activeMenu === 'contacts') loadContacts(); }, [activeMenu]);
+useEffect(() => { if (activeMenu === 'users') loadUsersTable(); }, [activeMenu]);
+useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoices(); } }, [activeMenu]);
 
   const openNewMessage = () => {
     setMessageFormData({
@@ -1799,7 +2364,8 @@ const BackofficeDigital = () => {
         </div>
         <div className="overflow-x-auto">
           {(() => {
-            const groups = buildGroups(messages || [], groupMode);
+            const source = applyGlobalFilters(messages || []);
+            const groups = buildGroups(source, groupMode);
             return groups.map((g) => (
               <div key={(g.header?.key)||'all'} className="border-t">
                 {g.header && (
@@ -2000,6 +2566,106 @@ const BackofficeDigital = () => {
           {React.createElement(icon, { className: 'w-5 h-5 md:w-6 md:h-6 text-white' })}
         </div>
       </div>
+
+      {/* Paiements */}
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Paiements</h3>
+          <button onClick={openCreatePayment} className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+            <Plus className="w-4 h-4 mr-1" /> Ajouter un paiement
+          </button>
+        </div>
+        {paymentsError && <div className="text-sm text-red-600 mb-2">{paymentsError}</div>}
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="bg-gray-100 text-gray-700">
+                <th className="px-3 py-2 text-left">ID</th>
+                <th className="px-3 py-2 text-left">Utilisateur</th>
+                <th className="px-3 py-2 text-left">Service ID</th>
+                <th className="px-3 py-2 text-left">Devis Submission ID</th>
+                <th className="px-3 py-2 text-left">Statut</th>
+                <th className="px-3 py-2 text-left">Lien</th>
+                <th className="px-3 py-2 text-left">Créé le</th>
+                <th className="px-3 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paymentsLoading ? (
+                <tr><td className="px-3 py-2" colSpan={8}>Chargement...</td></tr>
+              ) : Array.isArray(paymentsTable) && paymentsTable.length > 0 ? (
+                paymentsTable.map(p => (
+                  <tr key={p.id} className="border-t">
+                    <td className="px-3 py-2">{p.id}</td>
+                    <td className="px-3 py-2">{p.user_id}</td>
+                    <td className="px-3 py-2">{p.service_id ?? '—'}</td>
+                    <td className="px-3 py-2">{p.id_devis_submissions ?? '—'}</td>
+                    <td className="px-3 py-2">{p.payment ? 'Confirmé' : 'En attente'}</td>
+                    <td className="px-3 py-2"><a className="text-indigo-600 hover:underline" href={p.payment_link} target="_blank" rel="noreferrer">{p.payment_link || '—'}</a></td>
+                    <td className="px-3 py-2">{p.created_at || '—'}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button onClick={() => openEditPayment(p)} className="inline-flex items-center px-2 py-1 text-indigo-600 hover:text-indigo-800 mr-2">
+                        <Edit className="w-4 h-4 mr-1" /> Éditer
+                      </button>
+                      <button onClick={() => deletePaymentRow(p.id)} className="inline-flex items-center px-2 py-1 text-red-600 hover:text-red-800">
+                        <Trash2 className="w-4 h-4 mr-1" /> Supprimer
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr><td className="px-3 py-2" colSpan={8}>Aucun paiement</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {paymentFormOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setPaymentFormOpen(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl p-6 w-[92%] max-w-xl">
+            <h4 className="text-lg font-semibold mb-4">{paymentFormMode === 'edit' ? 'Modifier le paiement' : 'Ajouter un paiement'}</h4>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-700">Utilisateur (user_id)</label>
+                <input type="number" className="mt-1 w-full px-3 py-2 border rounded" value={paymentFormData.user_id}
+                  onChange={e => setPaymentFormData(prev => ({ ...prev, user_id: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-700">Service ID (optionnel)</label>
+                  <input type="number" className="mt-1 w-full px-3 py-2 border rounded" value={paymentFormData.service_id}
+                    onChange={e => setPaymentFormData(prev => ({ ...prev, service_id: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700">Devis Submission ID (optionnel)</label>
+                  <input type="number" className="mt-1 w-full px-3 py-2 border rounded" value={paymentFormData.id_devis_submissions}
+                    onChange={e => setPaymentFormData(prev => ({ ...prev, id_devis_submissions: e.target.value }))} />
+                </div>
+              </div>
+              <p className="text-xs text-gray-600">Renseignez <span className="font-semibold">soit</span> Service ID <span className="font-semibold">soit</span> Devis Submission ID.</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center">
+                  <input id="payment_status" type="checkbox" className="mr-2" checked={!!paymentFormData.payment}
+                    onChange={e => setPaymentFormData(prev => ({ ...prev, payment: e.target.checked }))} />
+                  <label htmlFor="payment_status" className="text-sm text-gray-700">Confirmé</label>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-700">Lien</label>
+                  <input type="text" className="mt-1 w-full px-3 py-2 border rounded" value={paymentFormData.payment_link}
+                    onChange={e => setPaymentFormData(prev => ({ ...prev, payment_link: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setPaymentFormOpen(false)} className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm">Annuler</button>
+              <button onClick={savePayment} className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 
@@ -2007,14 +2673,6 @@ const BackofficeDigital = () => {
     <div className="space-y-4 md:space-y-6">
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          title="Revenus du mois" 
-          value="72,450 €" 
-          change={15.3} 
-          icon={DollarSign} 
-          color="bg-gradient-to-br from-blue-500 to-blue-600" 
-          subtitle="Target: 80,000 €"
-        />
         <StatCard 
           title="Projets actifs" 
           value="12" 
@@ -2262,7 +2920,8 @@ const BackofficeDigital = () => {
 
       {(() => {
         const normalized = projectSearch.trim().toLowerCase();
-        const filtered = projects.filter(p => {
+        const base = applyGlobalFilters(projects);
+        const filtered = base.filter(p => {
           const matchesSearch = !normalized || [p.nom, p.client, p.statut, p.priorite].some(v => String(v).toLowerCase().includes(normalized));
           const matchesStatus = !projectStatusFilter || p.statut === projectStatusFilter;
           const matchesPriority = !projectPriorityFilter || p.priorite === projectPriorityFilter;
@@ -2459,8 +3118,11 @@ const BackofficeDigital = () => {
         </div>
       </div>
 
+      {(() => {
+        const filtered = applyGlobalFilters(clients);
+        return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {clients.map((client) => (
+        {filtered.map((client) => (
           <div key={client.id} className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-start space-x-3">
@@ -2516,6 +3178,8 @@ const BackofficeDigital = () => {
           </div>
         ))}
       </div>
+        );
+      })()}
 
 {isOpenClient && selectedClient && (
   <div className="fixed top-0 right-0 h-full w-full bg-black/50 z-50">
@@ -2960,62 +3624,146 @@ const BackofficeDigital = () => {
     return renderTeam();
   };
 
-  const renderFinance = () => (
-    <div className="space-y-4 md:space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center space-x-3 mb-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <DollarSign className="w-6 h-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Revenus totaux</p>
-              <p className="text-2xl font-bold text-gray-900">328,450 €</p>
-            </div>
-          </div>
-          <p className="text-sm text-green-600 font-medium">+18.5% vs année dernière</p>
-        </div>
+  const renderFinance = () => {
+    const stats = computeFinanceStats(invoices);
+    const yoyLabel = stats?.yoyDeltaPct === null
+      ? '— vs année dernière'
+      : `${stats.yoyDeltaPct >= 0 ? '+' : ''}${Number(stats.yoyDeltaPct).toFixed(1)}% vs année dernière`;
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center space-x-3 mb-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <CreditCard className="w-6 h-6 text-blue-600" />
+    return (
+      <div className="space-y-4 md:space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <DollarSign className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Revenus totaux</p>
+                <p className="text-2xl font-bold text-gray-900">{formatEuro(stats.totalRevenue)}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">En attente</p>
-              <p className="text-2xl font-bold text-gray-900">45,750 €</p>
-            </div>
+            <p className={`text-sm ${Number(stats?.yoyDeltaPct || 0) >= 0 ? 'text-green-600' : 'text-red-600'} font-medium`}>{yoyLabel}</p>
           </div>
-          <p className="text-sm text-gray-600">8 factures impayées</p>
-        </div>
 
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center space-x-3 mb-3">
-            <div className="p-3 bg-red-100 rounded-lg">
-              <AlertCircle className="w-6 h-6 text-red-600" />
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <CreditCard className="w-6 h-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">En attente</p>
+                <p className="text-2xl font-bold text-gray-900">{formatEuro(stats.pendingAmount)}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">En retard</p>
-              <p className="text-2xl font-bold text-gray-900">6,300 €</p>
-            </div>
+            <p className="text-sm text-gray-600">{stats.unpaidCount} factures impayées</p>
           </div>
-          <p className="text-sm text-red-600 font-medium">Action requise</p>
+
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="p-3 bg-red-100 rounded-lg">
+                <AlertCircle className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">En retard</p>
+                <p className="text-2xl font-bold text-gray-900">{formatEuro(stats.overdueAmount)}</p>
+              </div>
+            </div>
+            <p className="text-sm text-red-600 font-medium">Action requise</p>
+          </div>
         </div>
-      </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="p-4 md:p-6 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-base md:text-lg font-semibold">Factures récentes</h3>
-          <div className="flex space-x-2">
-            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
-              <Download className="w-5 h-5" />
-            </button>
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 text-sm">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Nouvelle facture</span>
-            </button>
+        <div className="p-4 md:p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base md:text-lg font-semibold">Factures récentes</h3>
+            
+          </div>
+          {/* Zone de filtrage avancé */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder="Rechercher (N°, email, client)"
+                value={invoiceFilters.query}
+                onChange={(e) => setInvoiceFilters(f => ({ ...f, query: e.target.value }))}
+              />
+            </div>
+            <div>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                value={invoiceFilters.status}
+                onChange={(e) => setInvoiceFilters(f => ({ ...f, status: e.target.value }))}
+              >
+                <option value="">Tous statuts</option>
+                <option value="payée">Payée</option>
+                <option value="refusée">Refusée</option>
+                <option value="envoyée">Envoyée</option>
+                <option value="en_attente">En attente</option>
+              </select>
+            </div>
+            <div>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                value={invoiceFilters.issuedFrom}
+                onChange={(e) => setInvoiceFilters(f => ({ ...f, issuedFrom: e.target.value }))}
+              />
+            </div>
+            <div>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                value={invoiceFilters.issuedTo}
+                onChange={(e) => setInvoiceFilters(f => ({ ...f, issuedTo: e.target.value }))}
+              />
+            </div>
+            <div>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                value={invoiceFilters.dueFrom}
+                onChange={(e) => setInvoiceFilters(f => ({ ...f, dueFrom: e.target.value }))}
+              />
+            </div>
+            <div>
+              <input
+                type="date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                value={invoiceFilters.dueTo}
+                onChange={(e) => setInvoiceFilters(f => ({ ...f, dueTo: e.target.value }))}
+              />
+            </div>
+            <div>
+              <input
+                type="number"
+                min="0"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder="Montant min"
+                value={invoiceFilters.minAmount}
+                onChange={(e) => setInvoiceFilters(f => ({ ...f, minAmount: e.target.value }))}
+              />
+            </div>
+            <div>
+              <input
+                type="number"
+                min="0"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                placeholder="Montant max"
+                value={invoiceFilters.maxAmount}
+                onChange={(e) => setInvoiceFilters(f => ({ ...f, maxAmount: e.target.value }))}
+              />
+            </div>
           </div>
         </div>
+        {invoiceError && (
+          <div className="mt-2 text-sm text-red-600">{invoiceError}</div>
+        )}
+        {loadingInvoices && (
+          <div className="mt-2 text-sm text-gray-600">Chargement des factures…</div>
+        )}
         
         {/* Desktop */}
         <div className="hidden md:block overflow-x-auto">
@@ -3032,57 +3780,172 @@ const BackofficeDigital = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {invoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{invoice.id}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{invoice.client}</td>
-                  <td className="px-6 py-4 text-sm font-semibold text-gray-900">{invoice.montant}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(invoice.statut)}`}>
-                      {invoice.statut}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{invoice.date}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{invoice.echeance}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex space-x-2">
-                      <button className="text-blue-600 hover:text-blue-800">
-                        <Download className="w-4 h-4" />
-                      </button>
-                      <button className="text-green-600 hover:text-green-800">
-                        <Send className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {(() => {
+                const todayStr = new Date().toISOString().slice(0,10);
+                const q = String(invoiceFilters.query || '').trim().toLowerCase();
+                const filtered = invoices.filter(inv => {
+                  const matchesText = !q || [
+                    `#${inv.id}`,
+                    String(inv.requester_email || ''),
+                    String(inv.client_name || '')
+                  ].some(s => String(s).toLowerCase().includes(q));
+                  const matchesStatus = !invoiceFilters.status || String(inv.status || '').toLowerCase() === String(invoiceFilters.status);
+                  const issued = inv.issued_date ? String(inv.issued_date).slice(0,10) : '';
+                  const matchesIssuedFrom = !invoiceFilters.issuedFrom || issued >= invoiceFilters.issuedFrom;
+                  const matchesIssuedTo = !invoiceFilters.issuedTo || issued <= invoiceFilters.issuedTo;
+                  const due = inv.due_date ? String(inv.due_date).slice(0,10) : '';
+                  const matchesDueFrom = !invoiceFilters.dueFrom || (due && due >= invoiceFilters.dueFrom);
+                  const matchesDueTo = !invoiceFilters.dueTo || (due && due <= invoiceFilters.dueTo);
+                  const amt = Number(inv.amount || 0);
+                  const minOk = !invoiceFilters.minAmount || amt >= Number(invoiceFilters.minAmount);
+                  const maxOk = !invoiceFilters.maxAmount || amt <= Number(invoiceFilters.maxAmount);
+                  return matchesText && matchesStatus && matchesIssuedFrom && matchesIssuedTo && matchesDueFrom && matchesDueTo && minOk && maxOk;
+                });
+                return filtered.map((invoice) => {
+                  const dueStr = invoice.due_date ? String(invoice.due_date).slice(0,10) : '';
+                  const isOverdue = Boolean(dueStr) && dueStr < todayStr && labelStatus(invoice.status) !== 'Payée';
+                  const rowClass = isOverdue ? 'bg-orange-50' : 'hover:bg-gray-50';
+                  return (
+                    <tr key={invoice.id} className={rowClass}>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                        <div className="flex flex-col">
+                          <span>#{invoice.id}</span>
+                          <span className="text-xs text-gray-500 mt-1">TKT-{String(invoice.id).padStart(6, '0')}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">{invoice.requester_email || '—'}</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatEuro(invoice.amount)}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(labelStatus(invoice.status))}`}>
+                          {labelStatus(invoice.status)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{fmtDate(invoice.issued_date)}</td>
+                      <td className="px-6 py-4 text-sm text-gray-500">{fmtDate(invoice.due_date)}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex space-x-2">
+                          <button className="text-blue-600 hover:text-blue-800" title="Télécharger">
+                            <Download className="w-4 h-4" />
+                          </button>
+                          {labelStatus(invoice.status) === 'Payée' ? (
+                            <div className="flex space-x-2 opacity-50 cursor-not-allowed">
+                              <button disabled className="text-green-600" title="Envoyer">
+                                <Send className="w-4 h-4" />
+                              </button>
+                              <button disabled className="text-emerald-600" title="Marquer payée">
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
+                              <button disabled className="text-red-600" title="Refuser">
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <button onClick={() => sendInvoiceEmail(invoice.id)} className="text-green-600 hover:text-green-800" title="Envoyer">
+                                <Send className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => setInvoiceStatus(invoice.id, 'payée')} className="text-emerald-600 hover:text-emerald-800" title="Marquer payée">
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
+                              {isAdmin && (
+                                <button onClick={() => deleteInvoice(invoice.id)} className="text-gray-600 hover:text-red-700" title="Supprimer">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                });
+              })()}
             </tbody>
           </table>
         </div>
 
         {/* Mobile */}
         <div className="md:hidden divide-y divide-gray-200">
-          {invoices.map((invoice) => (
-            <div key={invoice.id} className="p-4">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <p className="font-medium text-gray-900">{invoice.id}</p>
-                  <p className="text-sm text-gray-600 mt-1">{invoice.client}</p>
+          {(() => {
+            const todayStr = new Date().toISOString().slice(0,10);
+            const q = String(invoiceFilters.query || '').trim().toLowerCase();
+            const filtered = invoices.filter(inv => {
+              const matchesText = !q || [
+                `#${inv.id}`,
+                String(inv.requester_email || ''),
+                String(inv.client_name || '')
+              ].some(s => String(s).toLowerCase().includes(q));
+              const matchesStatus = !invoiceFilters.status || String(inv.status || '').toLowerCase() === String(invoiceFilters.status);
+              const issued = inv.issued_date ? String(inv.issued_date).slice(0,10) : '';
+              const matchesIssuedFrom = !invoiceFilters.issuedFrom || issued >= invoiceFilters.issuedFrom;
+              const matchesIssuedTo = !invoiceFilters.issuedTo || issued <= invoiceFilters.issuedTo;
+              const due = inv.due_date ? String(inv.due_date).slice(0,10) : '';
+              const matchesDueFrom = !invoiceFilters.dueFrom || (due && due >= invoiceFilters.dueFrom);
+              const matchesDueTo = !invoiceFilters.dueTo || (due && due <= invoiceFilters.dueTo);
+              const amt = Number(inv.amount || 0);
+              const minOk = !invoiceFilters.minAmount || amt >= Number(invoiceFilters.minAmount);
+              const maxOk = !invoiceFilters.maxAmount || amt <= Number(invoiceFilters.maxAmount);
+              return matchesText && matchesStatus && matchesIssuedFrom && matchesIssuedTo && matchesDueFrom && matchesDueTo && minOk && maxOk;
+            });
+            return filtered.map((invoice) => {
+              const dueStr = invoice.due_date ? String(invoice.due_date).slice(0,10) : '';
+              const isOverdue = Boolean(dueStr) && dueStr < todayStr && labelStatus(invoice.status) !== 'Payée';
+              const boxClass = isOverdue ? 'p-4 bg-orange-50' : 'p-4';
+              return (
+                <div key={invoice.id} className={boxClass}>
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-medium text-gray-900">#{invoice.id}</p>
+                      <p className="text-xs text-gray-500 mt-1">TKT-{String(invoice.id).padStart(6, '0')}</p>
+                      <p className="text-sm text-gray-600 mt-1">{invoice.requester_email || '—'}</p>
+                    </div>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(labelStatus(invoice.status))}`}>
+                      {labelStatus(invoice.status)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-semibold text-gray-900">{formatEuro(invoice.amount)}</span>
+                    <span className="text-gray-500">Échéance: {fmtDate(invoice.due_date)}</span>
+                  </div>
+                  <div className="flex space-x-3 mt-3">
+                    {labelStatus(invoice.status) === 'Payée' ? (
+                      <div className="flex space-x-3 opacity-50 cursor-not-allowed">
+                        <button disabled className="text-green-600" title="Envoyer">
+                          <Send className="w-4 h-4" />
+                        </button>
+                        <button disabled className="text-emerald-600" title="Marquer payée">
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                        <button disabled className="text-red-600" title="Refuser">
+                          <XCircle className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button onClick={() => sendInvoiceEmail(invoice.id)} className="text-green-600 hover:text-green-800" title="Envoyer">
+                          <Send className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setInvoiceStatus(invoice.id, 'payée')} className="text-emerald-600 hover:text-emerald-800" title="Marquer payée">
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                        {isAdmin && (
+                          <button onClick={() => deleteInvoice(invoice.id)} className="text-gray-600 hover:text-red-700" title="Supprimer">
+                            <XCircle className="w-4 h-4" />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(invoice.statut)}`}>
-                  {invoice.statut}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="font-semibold text-gray-900">{invoice.montant}</span>
-                <span className="text-gray-500">Échéance: {invoice.echeance}</span>
-              </div>
-            </div>
-          ))}
+              );
+            });
+          })()}
         </div>
       </div>
     </div>
   );
+  // Fermeture de la fonction renderFinance
+  };
 
   const renderAnalytics = () => (
     <div className="space-y-4 md:space-y-6">
@@ -4625,7 +5488,7 @@ const BackofficeDigital = () => {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Montant max (€)</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Montant max (Fcfa)</label>
             <input
               type="number"
               min="0"
@@ -4666,8 +5529,8 @@ const BackofficeDigital = () => {
                   <td className="p-4 text-center text-sm text-gray-600" colSpan={6}>Chargement...</td>
                 </tr>
               ) : Array.isArray(devisRequests) && devisRequests.length > 0 ? (
-                // Application des filtres avancés
-                devisRequests
+                // Application des filtres avancés + filtre global
+                applyGlobalFilters(devisRequests)
                   .filter((d) => {
                     const q = (devisFilters.query || '').trim().toLowerCase();
                     const name = String(d?.full_name || d?.client_name || '').toLowerCase();
@@ -4926,12 +5789,12 @@ const BackofficeDigital = () => {
 
       {/* ✅ LISTE MODERNE EN CARTES */}
       <div className="xl:col-span-3 space-y-4">
-        {(selectedDay ? appointments.filter(a => {
+        {((selectedDay ? applyGlobalFilters(appointments).filter(a => {
           const dt = a.appointment_date ? new Date(a.appointment_date) : null;
           if (!dt || Number.isNaN(dt.getTime())) return false;
           const key = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
           return key === selectedDay;
-        }) : appointments).map(a => {
+        }) : applyGlobalFilters(appointments)).map(a => {
           const dateStr = a.appointment_date ? new Date(a.appointment_date).toLocaleString('fr-FR') : "";
           const serviceTitle = a.service_id != null ? (servicesIndex[a.service_id] || a.service_id) : "-";
           return (
@@ -4981,7 +5844,7 @@ const BackofficeDigital = () => {
               </div>
             </div>
           );
-        })}
+        }))}
 
         {(!appointments || appointments.length === 0) && !appointmentsLoading && (
           <div className="text-center py-10 text-gray-500">Aucun rendez-vous</div>
@@ -5149,6 +6012,63 @@ const BackofficeDigital = () => {
   }
 
   const renderContent = () => {
+    const renderContacts = () => {
+      const rows = applyGlobalFilters(contacts);
+      return (
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Messages de contact</h2>
+          <button onClick={loadContacts} className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">
+            Recharger
+          </button>
+        </div>
+        {contactsError && (
+          <div className="mb-3 text-red-600">Erreur: {String(contactsError)}</div>
+        )}
+        <div className="bg-white rounded shadow overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="bg-gray-100 text-gray-700">
+                <th className="px-3 py-2 text-left">Nom</th>
+                <th className="px-3 py-2 text-left">Email</th>
+                <th className="px-3 py-2 text-left">Téléphone</th>
+                <th className="px-3 py-2 text-left">Sujet</th>
+                <th className="px-3 py-2 text-left">Message</th>
+                <th className="px-3 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {contactsLoading ? (
+                <tr><td className="px-3 py-2" colSpan={6}>Chargement...</td></tr>
+              ) : Array.isArray(rows) && rows.length > 0 ? (
+                rows.map((c) => (
+                  <tr key={c.id} className="border-t">
+                    <td className="px-3 py-2">{c.full_name || '—'}</td>
+                    <td className="px-3 py-2">{c.email || '—'}</td>
+                    <td className="px-3 py-2">{c.phone || '—'}</td>
+                    <td className="px-3 py-2">{c.subject || '—'}</td>
+                    <td className="px-3 py-2 max-w-[400px] truncate" title={c.message || ''}>{c.message || '—'}</td>
+                    <td className="px-3 py-2 text-right">
+                      <button onClick={() => openViewContact(c)} className="inline-flex items-center px-2 py-1 text-gray-700 hover:text-gray-900 mr-2">
+                        <Eye className="w-4 h-4 mr-1" /> Voir le message complet
+                      </button>
+                      <button onClick={() => openReplyContact(c)} className="inline-flex items-center px-2 py-1 text-blue-600 hover:text-blue-800 mr-2">
+                        <Send className="w-4 h-4 mr-1" /> Répondre
+                      </button>
+                      <button onClick={() => deleteContact(c.id)} className="inline-flex items-center px-2 py-1 text-red-600 hover:text-red-800">
+                        <Trash2 className="w-4 h-4 mr-1" /> Supprimer
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr><td className="px-3 py-2" colSpan={6}>Aucun message</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ); };
     switch (activeMenu) {
       case 'dashboard': return renderDashboard();
       case 'projects': return renderProjects();
@@ -5160,6 +6080,8 @@ const BackofficeDigital = () => {
       case 'analytics': return renderAnalytics();
       case 'tasks': return renderTasks();
       case 'messages': return renderMessages();
+      case 'users': return renderUsers();
+      case 'contacts': return renderContacts();
       case 'settings': return renderSettings();
       default: return renderDashboard();
     }
@@ -5249,6 +6171,10 @@ const BackofficeDigital = () => {
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
           <div className="flex items-center space-x-3">
+            {/* Bouton ouverture sidebar droite */}
+            <button onClick={openRightSidebar} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50" aria-label="Ouvrir panneau">
+              <DivideSquare className="w-5 h-5 text-gray-600" />
+            </button>
             <div className="relative">
               <button onClick={toggleNotifications} className="p-2 border border-gray-200 rounded-lg relative" aria-label="Notifications">
                 <Bell className="w-5 h-5 text-gray-600" />
@@ -5349,6 +6275,158 @@ const BackofficeDigital = () => {
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
           {renderContent()}
         </main>
+
+        {/* Sidebar droite sortante */}
+        {/* Overlay */}
+        {rightSidebarOpen && (
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={closeRightSidebar} aria-hidden="true"></div>
+        )}
+        {/* Panneau */}
+        <aside
+          className={`fixed right-0 top-0 h-full w-[360px] md:w-[420px] bg-white border-l border-gray-200 shadow-xl z-50 transform transition-transform duration-300 ${rightSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}
+          role="dialog"
+          aria-label="Sidebar droite"
+        >
+          <div className="flex items-center justify-between p-3 border-b">
+            <h3 className="text-sm font-semibold text-gray-800">Panneau latéral</h3>
+            <button onClick={closeRightSidebar} className="p-2 rounded hover:bg-gray-100" aria-label="Fermer panneau">
+              <X className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+          <div className="p-4 space-y-4 overflow-y-auto h-full">
+            {/* Filtre caché */}
+            <div className="border rounded-lg">
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(v => !v)}
+                className="w-full flex items-center justify-between px-3 py-2"
+                aria-expanded={filtersOpen}
+              >
+                <span className="text-sm font-medium flex items-center gap-2"><Filter className="w-4 h-4" /> Filtres</span>
+                <ChevronDown className={`w-4 h-4 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {filtersOpen && (
+                <div className="px-3 pb-3 space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Recherche (nom, message)"
+                    value={contactFilters.q}
+                    onChange={(e)=>setContactFilters(f=>({ ...f, q: e.target.value }))}
+                    className="w-full border rounded px-2 py-1 text-sm"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={contactFilters.email}
+                    onChange={(e)=>setContactFilters(f=>({ ...f, email: e.target.value }))}
+                    className="w-full border rounded px-2 py-1 text-sm"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Sujet"
+                    value={contactFilters.subject}
+                    onChange={(e)=>setContactFilters(f=>({ ...f, subject: e.target.value }))}
+                    className="w-full border rounded px-2 py-1 text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={contactFilters.dateFrom}
+                      onChange={(e)=>setContactFilters(f=>({ ...f, dateFrom: e.target.value }))}
+                      className="w-1/2 border rounded px-2 py-1 text-sm"
+                    />
+                    <input
+                      type="date"
+                      value={contactFilters.dateTo}
+                      onChange={(e)=>setContactFilters(f=>({ ...f, dateTo: e.target.value }))}
+                      className="w-1/2 border rounded px-2 py-1 text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={resetContactFilters} className="px-2 py-1 text-sm border rounded hover:bg-gray-50">Réinitialiser</button>
+                    <button onClick={()=>setFiltersOpen(false)} className="px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Appliquer</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Ce panneau peut afficher des détails, des filtres ou des actions rapides du Backoffice.</p>
+            </div>
+            {/* Exemple: résumé rapide des contacts */}
+            <div className="border rounded-lg">
+              <div className="px-3 py-2 border-b flex items-center justify-between">
+                <span className="text-sm font-medium">Aperçu Contacts</span>
+                <button onClick={() => { closeRightSidebar(); setActiveMenu('contacts'); navigate('/backoffice/contacts'); }} className="text-xs text-blue-600 hover:text-blue-800">Ouvrir</button>
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                {Array.isArray(contacts) && contacts.length > 0 ? (
+                  contacts.slice(0, 5).map(c => (
+                    <div key={c.id} className="px-3 py-2 border-t">
+                      <div className="text-sm font-medium text-gray-800 truncate">{c.full_name || '—'}</div>
+                      <div className="text-xs text-gray-600 truncate">{c.email || ''} • {c.subject || ''}</div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-3 py-2 text-sm text-gray-500">Aucun message récent</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </aside>
+        {contactReplyOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setContactReplyOpen(false)} />
+            <div className="relative bg-white rounded-xl shadow-xl p-6 w-[92%] max-w-xl">
+              <h4 className="text-lg font-semibold mb-4">Répondre au contact</h4>
+              {contactReplyError && (
+                <div className="mb-3 text-sm text-red-600">{contactReplyError}</div>
+              )}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Destinataire</label>
+                  <input type="email" value={contactReplyData.email} disabled className="w-full border rounded px-3 py-2 bg-gray-50 text-gray-700" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Sujet</label>
+                  <input type="text" value={contactReplyData.subject} onChange={(e)=>setContactReplyData(d=>({ ...d, subject: e.target.value }))} className="w-full border rounded px-3 py-2" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Message</label>
+                  <textarea rows={8} value={contactReplyData.message} onChange={(e)=>setContactReplyData(d=>({ ...d, message: e.target.value }))} className="w-full border rounded px-3 py-2" placeholder="Votre réponse au client..." />
+                </div>
+              </div>
+              <div className="mt-6 flex items-center justify-end gap-2">
+                <button onClick={() => setContactReplyOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded">Annuler</button>
+                <button onClick={sendContactReply} disabled={contactReplySending} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded inline-flex items-center">
+                  <Send className="w-4 h-4 mr-1" /> {contactReplySending ? 'Envoi...' : 'Envoyer'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {contactViewOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setContactViewOpen(false)} />
+            <div className="relative bg-white rounded-xl shadow-xl p-6 w-[92%] max-w-2xl">
+              <h4 className="text-lg font-semibold mb-4">Message de contact</h4>
+              <div className="space-y-3 text-sm">
+                <div><span className="font-medium">Nom:</span> {contactViewData?.full_name || '—'}</div>
+                <div><span className="font-medium">Email:</span> {contactViewData?.email || '—'}</div>
+                <div><span className="font-medium">Téléphone:</span> {contactViewData?.phone || '—'}</div>
+                <div><span className="font-medium">Sujet:</span> {contactViewData?.subject || '—'}</div>
+                <div>
+                  <span className="font-medium">Message:</span>
+                  <div className="mt-2 p-3 border rounded bg-gray-50">
+                    <div dangerouslySetInnerHTML={{ __html: contactViewData?.message || '' }} />
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 flex items-center justify-end">
+                <button onClick={() => setContactViewOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded">Fermer</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

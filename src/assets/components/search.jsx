@@ -172,11 +172,13 @@ export default function SearchBar() {
             <div className="w-px h-6 bg-gray-300"></div>
             
             <button
+              onClick={()=>navigate('/submission')}
               type="button"
               className="text-blue-500 flex items-center gap-1 hover:text-blue-600 transition-colors"
               title="Recherche vocale"
             >
-              <FolderKanban size={20} /> <span className='hidden lg:block m-0 p-0'>J'ai un projet</span>
+              <FolderKanban size={20} />
+              <span className='hidden lg:block m-0 p-0'>J'ai un projet</span>
             </button>
             
             

@@ -227,11 +227,21 @@ function App() {
                   <FollowService />
                 </RequireAuth>
               } />
+              
+              <Route path="/backoffice/contacts" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+              <Route path="backoffice/users" element={
+               <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
 
               <Route path="/pay/:link" element={<Pay />} />
           </Routes>
-          
-          
+
         </PopupProvider>
       </GoogleOAuthProvider>
     </div>

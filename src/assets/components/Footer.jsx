@@ -78,18 +78,18 @@ const Footer = () => {
             <div className="text-dark">
               <h4 className="font-semibold text-dark mb-4">Légal</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="/privacy#section-9" className="hover:text-amber-600 transition-colors">Mentions légales</a></li>
-                <li><a href="/privacy#section-10" className="hover:text-amber-600 transition-colors">CGV</a></li>
-                <li><a href="/privacy#section-11" className="hover:text-amber-600 transition-colors">CGU</a></li>
-                <li><a href="/privacy#section-12" className="hover:text-amber-600 transition-colors">Politique de cookies</a></li>
+                <li><a href="/privacy#section-9" className="hover:text-slate-600 transition-colors">Mentions légales</a></li>
+                <li><a href="/privacy#section-10" className="hover:text-slate-600 transition-colors">CGV</a></li>
+                <li><a href="/privacy#section-11" className="hover:text-slate-600 transition-colors">CGU</a></li>
+                <li><a href="/privacy#section-12" className="hover:text-slate-600 transition-colors">Politique de cookies</a></li>
               </ul>
             </div>
             <div className="text-dark">
               <h4 className="font-semibold text-dark mb-4">Support</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="/contact" className="hover:text-amber-600 transition-colors">Contact</a></li>
-                <li><a href="/privacy#section-13" className="hover:text-amber-600 transition-colors">FAQ</a></li>
-                <li><a href="#" className="hover:text-amber-600 transition-colors">Garanties</a></li>
+                <li><a href="/contact" className="hover:text-slate-600 transition-colors">Contact</a></li>
+                <li><a href="/privacy#section-13" className="hover:text-slate-600 transition-colors">FAQ</a></li>
+                <li><a href="#" className="hover:text-slate-600 transition-colors">Garanties</a></li>
               </ul>
             </div>
             <div>

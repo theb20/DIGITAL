@@ -1,45 +1,36 @@
 import api from '../api/api_axios.js';
 
-const BASE = '/pay';
+const BASE = '/invoices';
 
-const paymentService = {
-  // CRUD pour backoffice Finance
+const invoicesService = {
   async list() {
     const res = await api.get(BASE);
     return res.data;
   },
-
   async get(id) {
     const res = await api.get(`${BASE}/${id}`);
     return res.data;
   },
-
-  async createPayment(data) {
-    // Accepte { user_id, service_id? , id_devis_submissions? }
-    const res = await api.post(BASE, data);
+  async create(payload) {
+    const res = await api.post(BASE, payload);
     return res.data;
   },
-
   async update(id, payload) {
     const res = await api.put(`${BASE}/${id}`, payload);
     return res.data;
   },
-
   async remove(id) {
     const res = await api.delete(`${BASE}/${id}`);
     return res.data;
   },
-
-  // Flux lien de paiement public
-  async verifyPayment(link) {
-    const res = await api.get(`${BASE}/verify/${link}`);
+  async sendEmail(id) {
+    const res = await api.post(`${BASE}/${id}/send-email`);
     return res.data;
   },
-
-  async confirmPayment(id) {
-    const res = await api.post(`${BASE}/confirm`, { id });
+  async setStatus(id, status) {
+    const res = await api.post(`${BASE}/${id}/status`, { status });
     return res.data;
   }
 };
 
-export default paymentService;
+export default invoicesService;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle, Building, User, MessageSquare, AlertCircle } from "lucide-react";
+import contactApi from "../configurations/services/contact.js";
 
 const ContactPage = () => {
     useState(()=>{
@@ -63,7 +64,7 @@ const ContactPage = () => {
     return newErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = validateForm();
     
@@ -73,9 +74,16 @@ const ContactPage = () => {
     }
     
     setIsLoading(true);
-    
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const payload = {
+        full_name: `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone?.trim() || null,
+        startup: formData.company?.trim() || null,
+        subject: formData.subject || null,
+        message: formData.message.trim(),
+      };
+      await contactApi.create(payload);
       setIsSuccess(true);
       setFormData({
         firstName: "",
@@ -88,11 +96,13 @@ const ContactPage = () => {
         agreeToTerms: false,
       });
       setErrors({});
-      
-      setTimeout(() => {
-        setIsSuccess(false);
-      }, 5000);
-    }, 2000);
+      setTimeout(() => setIsSuccess(false), 5000);
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Échec de l\'envoi du message';
+      setErrors(prev => ({ ...prev, submit: msg }));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (e) => {

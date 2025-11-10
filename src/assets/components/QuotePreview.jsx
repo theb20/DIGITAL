@@ -469,6 +469,11 @@ React.useEffect(() => {
                 <p className="text-slate-600">
                   <strong>Validité :</strong> {new Date(quoteData.validityDate).toLocaleDateString('fr-FR')}
                 </p>
+                {quoteData?.quoteDate && (
+                  <p className="text-slate-600">
+                    <strong>Échéance facture :</strong> {(() => { const base = new Date(quoteData.quoteDate); const d = new Date(base); d.setDate(d.getDate() + Number(import.meta?.env?.VITE_INVOICE_DUE_DAYS || 14)); return d.toLocaleDateString('fr-FR'); })()}
+                  </p>
+                )}
                 {quoteData.projectDeadline && (
                   <p className="text-slate-600">
                     <strong>Délai :</strong> {quoteData.projectDeadline}

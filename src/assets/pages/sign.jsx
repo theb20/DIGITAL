@@ -128,7 +128,7 @@ const AuthPage = () => {
           </div>
 
           {/* Social Buttons */}
-          <div style={{ width: "100%" }}>
+          <div className="flex flex-col gap-4 items-center justify-center" style={{ width: "100%" }}>
           
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
