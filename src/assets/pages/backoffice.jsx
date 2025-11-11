@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { Home, Users, ShoppingCart, FileText, Settings, LogOut, Menu, X, TrendingUp, DollarSign, Package, Search, Bell, ChevronDown, Eye, Edit, Trash2, Plus, Calendar, CreditCard, Activity, Award, Mail, Phone, MapPin, Filter, Download, Upload, Save, Send, Star, Clock, CheckCircle, XCircle, AlertCircle, Zap, Target, BarChart3, PieChart as PieChartIcon, TrendingDown, RefreshCw, Globe, Smartphone, Monitor, FileJson, FileSpreadsheet, Lock, ArrowLeft, DivideSquare } from 'lucide-react';
+import { Home, Users, ShoppingCart, FileText, Settings, LogOut, Menu, X, TrendingUp, DollarSign, Package, Search, Bell, ChevronDown, Eye, Edit, Trash2, Plus, Calendar, CreditCard, Activity, Award, Mail, Phone, MapPin, Filter, Download, Upload, Save, Send, Star, Clock, CheckCircle, XCircle, AlertCircle, Zap, Target, BarChart3, PieChart as PieChartIcon, TrendingDown, RefreshCw, Globe, Smartphone, Monitor, FileJson, FileSpreadsheet, Lock, ArrowLeft, DivideSquare, ChartGantt } from 'lucide-react';
 import serviceCategoriesApi from '../configurations/services/serviceCategories.js';
 import servicesApi from '../configurations/services/services.js';
 import devisRequestsApi from '../configurations/services/devisRequests.js';
@@ -20,6 +20,10 @@ import appointmentsApi from '../configurations/services/appointments.js';
 import invoicesApi from '../configurations/services/invoices.js';
 import notificationsApi from '../configurations/services/notifications.js';
 import contactApi from '../configurations/services/contact.js';
+
+import PlanningComponent from '../components/planning.jsx';
+import DashboardComponent from '../components/Dashboard.jsx';
+import ComponentProjets from '../components/Project.jsx';
 import { connectRealtime } from '../configurations/realtime.js';
 
 const BackofficeDigital = () => {
@@ -1415,9 +1419,6 @@ const BackofficeDigital = () => {
   const [paymentsTable, setPaymentsTable] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsError, setPaymentsError] = useState('');
-  const [paymentFormOpen, setPaymentFormOpen] = useState(false);
-  const [paymentFormMode, setPaymentFormMode] = useState('create');
-  const [paymentFormData, setPaymentFormData] = useState({ id: null, user_id: '', service_id: '', id_devis_submissions: '', payment: false, payment_link: '' });
 
   const loadPaymentsTable = async () => {
     try {
@@ -1432,63 +1433,7 @@ const BackofficeDigital = () => {
     }
   };
 
-  const openCreatePayment = () => {
-    setPaymentFormMode('create');
-    setPaymentFormData({ id: null, user_id: '', service_id: '', id_devis_submissions: '', payment: false, payment_link: '' });
-    setPaymentFormOpen(true);
-  };
-
-  const openEditPayment = (p) => {
-    setPaymentFormMode('edit');
-    setPaymentFormData({
-      id: p?.id,
-      user_id: p?.user_id ?? '',
-      service_id: p?.service_id ?? '',
-      id_devis_submissions: p?.id_devis_submissions ?? '',
-      payment: !!p?.payment,
-      payment_link: p?.payment_link ?? ''
-    });
-    setPaymentFormOpen(true);
-  };
-
-  const savePayment = async () => {
-    try {
-      const payload = {
-        user_id: paymentFormData.user_id ? Number(paymentFormData.user_id) : undefined,
-        service_id: paymentFormData.service_id ? Number(paymentFormData.service_id) : null,
-        id_devis_submissions: paymentFormData.id_devis_submissions ? Number(paymentFormData.id_devis_submissions) : null,
-        payment: !!paymentFormData.payment,
-        payment_link: paymentFormData.payment_link || undefined,
-      };
-      if (!payload.service_id && !payload.id_devis_submissions) {
-        alert('Renseignez soit Service ID, soit Devis Submission ID');
-        return;
-      }
-      if (paymentFormMode === 'edit' && paymentFormData.id) {
-        const updated = await payApi.update(paymentFormData.id, payload);
-        setPaymentsTable(prev => prev.map(x => x.id === updated.id ? updated : x));
-      } else {
-        const created = await payApi.createPayment(payload);
-        const full = await payApi.get(created.id);
-        setPaymentsTable(prev => [full, ...prev]);
-      }
-      setPaymentFormOpen(false);
-    } catch (e) {
-      alert(e?.message || 'Échec de la sauvegarde du paiement');
-    }
-  };
-
-  const deletePaymentRow = async (id) => {
-    if (!id) return;
-    if (!confirm('Supprimer ce paiement ?')) return;
-    try {
-      await payApi.remove(id);
-      setPaymentsTable(prev => prev.filter(x => x.id !== id));
-    } catch (e) {
-      alert(e?.message || 'Erreur lors de la suppression du paiement');
-    }
-  };
-
+ 
 
   // Factures (backend)
   const [invoices, setInvoices] = useState([]);
@@ -2084,18 +2029,17 @@ const BackofficeDigital = () => {
   const location = useLocation();
  const menuItems = [
     { id: 'dashboard', name: 'Tableau de bord', icon: Home, path: '/backoffice/dashboard' },
-    { id: 'projects', name: 'Services', icon: Package, path: '/backoffice/services' },
     { id: 'devis', name: 'Suivi devis', icon: FileText, path: '/backoffice/devis' },
     { id: 'appointments', name: 'Rendez-vous', icon: Calendar, path: '/backoffice/appointments' },
+    { id: 'projets', name: 'Projets', icon: DivideSquare, path: '/backoffice/projets' },
     { id: 'contacts', name: 'Contacts', icon: Phone, path: '/backoffice/contacts' },
     { id: 'users', name: 'Utilisateurs', icon: Users, path: '/backoffice/users' },
-    { id: 'settings', name: 'Paramètres', icon: Settings, path: '/backoffice/parametre' },
     { id: 'messages', name: 'Messagerie', icon: Mail, path: '/backoffice/messages' },
     { id: 'clients', name: 'Clients', icon: Users, path: '/backoffice/clients' },
-    { id: 'team', name: 'Équipe', icon: Award, path: '/backoffice' },
-    { id: 'finance', name: 'Finance', icon: DollarSign, path: '/backoffice' },
-    { id: 'analytics', name: 'Analytics', icon: BarChart3, path: '/backoffice' },
-    { id: 'tasks', name: 'Tâches', icon: CheckCircle, path: '/backoffice' },
+    { id: 'team', name: 'Équipe', icon: Award, path: '/backoffice/teams' },
+    { id: 'finance', name: 'Finance', icon: DollarSign, path: '/backoffice/invoices' },
+    { id: 'planning', name: 'Emploi du temps', icon: ChartGantt, path: '/backoffice/planning' },
+    { id: 'settings', name: 'Paramètres', icon: Settings, path: '/backoffice/parametre' },
   ];
 
   useEffect(() => {
@@ -2103,11 +2047,15 @@ const BackofficeDigital = () => {
     if (p.includes('/backoffice/services')) setActiveMenu('projects');
     else if (p.includes('/backoffice/devis')) setActiveMenu('devis');
     else if (p.includes('/backoffice/appointments')) setActiveMenu('appointments');
+    else if (p.includes('/backoffice/projets')) setActiveMenu('projets');
     else if (p.includes('/backoffice/contacts')) setActiveMenu('contacts');
     else if (p.includes('/backoffice/users')) setActiveMenu('users');
     else if (p.includes('/backoffice/parametre')) setActiveMenu('settings');
     else if (p.includes('/backoffice/messages')) setActiveMenu('messages');
     else if (p.includes('/backoffice/clients')) setActiveMenu('clients');
+    else if (p.includes('/backoffice/teams')) setActiveMenu('team');
+    else if (p.includes('/backoffice/invoices')) setActiveMenu('finance');
+    else if (p.includes('/backoffice/planning')) setActiveMenu('planning');
     else setActiveMenu('dashboard');
   }, [location.pathname]);
 
@@ -2170,7 +2118,7 @@ const BackofficeDigital = () => {
     limit: 20,
     offset: 0,
   });
-  const STANDARD_EMAIL = import.meta.env.VITE_STANDARD_EMAIL || 'support@digital.tld';
+  const STANDARD_EMAIL = import.meta.env.VITE_STANDARD_EMAIL || 'company.digital.noreply@gmail.com';
   const currentUserEmail = session.getSessionEmail();
   const currentUserRole = session.getSessionRole && session.getSessionRole();
   const isAdmin = String(currentUserRole || '').toLowerCase() === 'admin';
@@ -2540,549 +2488,15 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
     resetProjectForm();
   };
 
-  // Supprimé: handleMenuClick non utilisé
 
-  const StatCard = ({ title, value, change, icon, color, subtitle }) => (
-    <div className="bg-white rounded-xl shadow-sm p-4 md:p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <p className="text-xs md:text-sm text-gray-600 mb-1">{title}</p>
-          <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-1">{value}</h3>
-          {subtitle && <p className="text-xs text-gray-500 mb-2">{subtitle}</p>}
-          {change !== undefined && (
-            <div className="flex items-center space-x-1">
-              {change >= 0 ? (
-                <TrendingUp className="w-4 h-4 text-green-600" />
-              ) : (
-                <TrendingDown className="w-4 h-4 text-red-600" />
-              )}
-              <p className={`text-xs md:text-sm font-medium ${change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {Math.abs(change)}% vs période précédente
-              </p>
-            </div>
-          )}
-        </div>
-        <div className={`${color} p-3 rounded-xl`}>
-          {React.createElement(icon, { className: 'w-5 h-5 md:w-6 md:h-6 text-white' })}
-        </div>
-      </div>
-
-      {/* Paiements */}
-      <div className="bg-white rounded-xl shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Paiements</h3>
-          <button onClick={openCreatePayment} className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
-            <Plus className="w-4 h-4 mr-1" /> Ajouter un paiement
-          </button>
-        </div>
-        {paymentsError && <div className="text-sm text-red-600 mb-2">{paymentsError}</div>}
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="bg-gray-100 text-gray-700">
-                <th className="px-3 py-2 text-left">ID</th>
-                <th className="px-3 py-2 text-left">Utilisateur</th>
-                <th className="px-3 py-2 text-left">Service ID</th>
-                <th className="px-3 py-2 text-left">Devis Submission ID</th>
-                <th className="px-3 py-2 text-left">Statut</th>
-                <th className="px-3 py-2 text-left">Lien</th>
-                <th className="px-3 py-2 text-left">Créé le</th>
-                <th className="px-3 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paymentsLoading ? (
-                <tr><td className="px-3 py-2" colSpan={8}>Chargement...</td></tr>
-              ) : Array.isArray(paymentsTable) && paymentsTable.length > 0 ? (
-                paymentsTable.map(p => (
-                  <tr key={p.id} className="border-t">
-                    <td className="px-3 py-2">{p.id}</td>
-                    <td className="px-3 py-2">{p.user_id}</td>
-                    <td className="px-3 py-2">{p.service_id ?? '—'}</td>
-                    <td className="px-3 py-2">{p.id_devis_submissions ?? '—'}</td>
-                    <td className="px-3 py-2">{p.payment ? 'Confirmé' : 'En attente'}</td>
-                    <td className="px-3 py-2"><a className="text-indigo-600 hover:underline" href={p.payment_link} target="_blank" rel="noreferrer">{p.payment_link || '—'}</a></td>
-                    <td className="px-3 py-2">{p.created_at || '—'}</td>
-                    <td className="px-3 py-2 text-right">
-                      <button onClick={() => openEditPayment(p)} className="inline-flex items-center px-2 py-1 text-indigo-600 hover:text-indigo-800 mr-2">
-                        <Edit className="w-4 h-4 mr-1" /> Éditer
-                      </button>
-                      <button onClick={() => deletePaymentRow(p.id)} className="inline-flex items-center px-2 py-1 text-red-600 hover:text-red-800">
-                        <Trash2 className="w-4 h-4 mr-1" /> Supprimer
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr><td className="px-3 py-2" colSpan={8}>Aucun paiement</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {paymentFormOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setPaymentFormOpen(false)} />
-          <div className="relative bg-white rounded-xl shadow-xl p-6 w-[92%] max-w-xl">
-            <h4 className="text-lg font-semibold mb-4">{paymentFormMode === 'edit' ? 'Modifier le paiement' : 'Ajouter un paiement'}</h4>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-700">Utilisateur (user_id)</label>
-                <input type="number" className="mt-1 w-full px-3 py-2 border rounded" value={paymentFormData.user_id}
-                  onChange={e => setPaymentFormData(prev => ({ ...prev, user_id: e.target.value }))} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-700">Service ID (optionnel)</label>
-                  <input type="number" className="mt-1 w-full px-3 py-2 border rounded" value={paymentFormData.service_id}
-                    onChange={e => setPaymentFormData(prev => ({ ...prev, service_id: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-700">Devis Submission ID (optionnel)</label>
-                  <input type="number" className="mt-1 w-full px-3 py-2 border rounded" value={paymentFormData.id_devis_submissions}
-                    onChange={e => setPaymentFormData(prev => ({ ...prev, id_devis_submissions: e.target.value }))} />
-                </div>
-              </div>
-              <p className="text-xs text-gray-600">Renseignez <span className="font-semibold">soit</span> Service ID <span className="font-semibold">soit</span> Devis Submission ID.</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center">
-                  <input id="payment_status" type="checkbox" className="mr-2" checked={!!paymentFormData.payment}
-                    onChange={e => setPaymentFormData(prev => ({ ...prev, payment: e.target.checked }))} />
-                  <label htmlFor="payment_status" className="text-sm text-gray-700">Confirmé</label>
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-700">Lien</label>
-                  <input type="text" className="mt-1 w-full px-3 py-2 border rounded" value={paymentFormData.payment_link}
-                    onChange={e => setPaymentFormData(prev => ({ ...prev, payment_link: e.target.value }))} />
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setPaymentFormOpen(false)} className="px-3 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm">Annuler</button>
-              <button onClick={savePayment} className="px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm">Enregistrer</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
+  
 
   const renderDashboard = () => (
-    <div className="space-y-4 md:space-y-6">
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          title="Projets actifs" 
-          value="12" 
-          change={8.5} 
-          icon={Package} 
-          color="bg-gradient-to-br from-purple-500 to-purple-600" 
-          subtitle="3 livrables cette semaine"
-        />
-        <StatCard 
-          title="Clients actifs" 
-          value="48" 
-          change={12.1} 
-          icon={Users} 
-          color="bg-gradient-to-br from-green-500 to-green-600" 
-          subtitle="4 nouveaux ce mois"
-        />
-        <StatCard 
-          title="Taux de satisfaction" 
-          value="94%" 
-          change={3.2} 
-          icon={Star} 
-          color="bg-gradient-to-br from-orange-500 to-orange-600" 
-          subtitle="Basé sur 156 avis"
-        />
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base md:text-lg font-semibold">Performance financière</h3>
-            <select 
-              className="text-sm border border-gray-300 rounded-lg px-3 py-1.5"
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-            >
-              <option value="7days">7 jours</option>
-              <option value="30days">30 jours</option>
-              <option value="90days">90 jours</option>
-            </select>
-          </div>
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={revenueData}>
-              <defs>
-                <linearGradient id="colorRevenu" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Area type="monotone" dataKey="revenus" stroke="#3b82f6" fillOpacity={1} fill="url(#colorRevenu)" />
-              <Area type="monotone" dataKey="profit" stroke="#10b981" fillOpacity={1} fill="url(#colorProfit)" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-          <h3 className="text-base md:text-lg font-semibold mb-4">Répartition clients par segment</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie
-                data={clientsData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={90}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {clientsData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Traffic Analytics */}
-      <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-        <h3 className="text-base md:text-lg font-semibold mb-4">Trafic et conversions (7 derniers jours)</h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={trafficData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 12 }} />
-            <Tooltip />
-            <Bar dataKey="visitors" fill="#3b82f6" radius={[8, 8, 0, 0]} />
-            <Bar dataKey="conversions" fill="#10b981" radius={[8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Recent Projects */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="p-4 md:p-6 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="text-base md:text-lg font-semibold">Projets récents</h3>
-          <button className="text-blue-600 text-sm font-medium hover:text-blue-700">Voir tout</button>
-        </div>
-        
-        {/* Desktop */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Projet</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Progression</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Budget</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statut</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {projects.slice(0, 5).map((project) => (
-                <tr key={project.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{project.nom}</div>
-                      <div className={`text-xs ${getPriorityColor(project.priorite)}`}>
-                        Priorité {project.priorite}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{project.client}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center space-x-2">
-                      <div className="flex-1 bg-gray-200 rounded-full h-2 w-24">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
-                          style={{ width: `${project.progression}%` }}
-                        ></div>
-                      </div>
-                      <span className="text-sm text-gray-600">{project.progression}%</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-semibold text-gray-900">{project.budget}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(project.statut)}`}>
-                      {project.statut}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <button className="text-blue-600 hover:text-blue-800">
-                      <Eye className="w-5 h-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile */}
-        <div className="md:hidden divide-y divide-gray-200">
-          {projects.slice(0, 5).map((project) => (
-            <div key={project.id} className="p-4">
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 text-sm">{project.nom}</h4>
-                  <p className="text-xs text-gray-600 mt-1">{project.client}</p>
-                </div>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(project.statut)}`}>
-                  {project.statut}
-                </span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full" 
-                      style={{ width: `${project.progression}%` }}
-                    ></div>
-                  </div>
-                  <span className="text-xs text-gray-600">{project.progression}%</span>
-                </div>
-                <div className="flex justify-between items-center text-xs">
-                  <span className={`font-medium ${getPriorityColor(project.priorite)}`}>
-                    Priorité {project.priorite}
-                  </span>
-                  <span className="font-semibold text-gray-900">{project.budget}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
+    <DashboardComponent />
   );
 
   const renderProjects = () => (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
-        <div className="flex items-center space-x-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Rechercher un projet..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-              value={projectSearch}
-              onChange={(e) => setProjectSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <select
-              className="text-sm border border-gray-300 rounded-lg px-3 py-2"
-              value={projectStatusFilter}
-              onChange={(e) => setProjectStatusFilter(e.target.value)}
-            >
-              <option value="">Statut: Tous</option>
-              <option value="Actif">Actif</option>
-              <option value="Inactif">Inactif</option>
-              <option value="Planifié">Planifié</option>
-              <option value="En cours">En cours</option>
-              <option value="En révision">En révision</option>
-              <option value="Terminé">Terminé</option>
-            </select>
-            <select
-              className="text-sm border border-gray-300 rounded-lg px-3 py-2"
-              value={projectPriorityFilter}
-              onChange={(e) => setProjectPriorityFilter(e.target.value)}
-            >
-              <option value="">Priorité: Toutes</option>
-              <option value="Basse">Basse</option>
-              <option value="Moyenne">Moyenne</option>
-              <option value="Haute">Haute</option>
-            </select>
-          </div>
-        </div>
-        <button onClick={handleAddProject} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 text-sm">
-          <Plus className="w-5 h-5" />
-          <span>Nouveau projet</span>
-        </button>
-      </div>
-
-      {(() => {
-        const normalized = projectSearch.trim().toLowerCase();
-        const base = applyGlobalFilters(projects);
-        const filtered = base.filter(p => {
-          const matchesSearch = !normalized || [p.nom, p.client, p.statut, p.priorite].some(v => String(v).toLowerCase().includes(normalized));
-          const matchesStatus = !projectStatusFilter || p.statut === projectStatusFilter;
-          const matchesPriority = !projectPriorityFilter || p.priorite === projectPriorityFilter;
-          return matchesSearch && matchesStatus && matchesPriority;
-        });
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filtered.map((project) => (
-              <div key={project.id} className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{project.nom}</h3>
-                    <p className="text-sm text-gray-600">{project.client}</p>
-                  </div>
-                  <span className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(project.statut)}`}>
-                    {project.statut}
-                  </span>
-                </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-600">Progression</span>
-                      <span className="font-medium text-gray-900">{project.progression}%</span>
-                    </div>
-                    <div className="bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                        style={{ width: `${project.progression}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
-                    <div>
-                      <p className="text-xs text-gray-600 mb-1">Budget</p>
-                      <p className="text-sm font-semibold text-gray-900">{project.budget}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600 mb-1">Deadline</p>
-                      <p className="text-sm font-medium text-gray-900">{project.deadline}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                    <span className={`text-sm font-medium ${getPriorityColor(project.priorite)}`}>
-                      Priorité {project.priorite}
-                    </span>
-                    <div className="flex space-x-2">
-                      <button className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleEditProject(project)} className="p-2 text-green-600 hover:bg-green-50 rounded-lg">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDeleteProject(project.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
-
-      {projectFormOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white w-full max-w-lg rounded-xl shadow-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">{projectFormData.id ? 'Modifier le projet' : 'Nouveau projet'}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs text-gray-600">Nom</label>
-                <input
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  value={projectFormData.nom}
-                  onChange={(e) => setProjectFormData({ ...projectFormData, nom: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-600">Client</label>
-                <input
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  value={projectFormData.client}
-                  onChange={(e) => setProjectFormData({ ...projectFormData, client: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-600">Statut</label>
-                <select
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  value={projectFormData.statut}
-                  onChange={(e) => setProjectFormData({ ...projectFormData, statut: e.target.value })}
-                >
-                  <option>Planifié</option>
-                  <option>En cours</option>
-                  <option>En révision</option>
-                  <option>Terminé</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-600">Priorité</label>
-                <select
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  value={projectFormData.priorite}
-                  onChange={(e) => setProjectFormData({ ...projectFormData, priorite: e.target.value })}
-                >
-                  <option>Basse</option>
-                  <option>Moyenne</option>
-                  <option>Haute</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gray-600">Progression (%)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  value={projectFormData.progression}
-                  onChange={(e) => setProjectFormData({ ...projectFormData, progression: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-600">Budget</label>
-                <input
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  placeholder="ex: 20,000 €"
-                  value={projectFormData.budget}
-                  onChange={(e) => setProjectFormData({ ...projectFormData, budget: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-600">Deadline</label>
-                <input
-                  type="date"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  value={projectFormData.deadline}
-                  onChange={(e) => setProjectFormData({ ...projectFormData, deadline: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end space-x-2">
-              <button
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm"
-                onClick={() => { setProjectFormOpen(false); resetProjectForm(); }}
-              >
-                Annuler
-              </button>
-              <button
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm"
-                onClick={handleSaveProject}
-              >
-                Enregistrer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    <ComponentProjets/>
   );
 
   const openModalClient = (e, c) => {
@@ -3366,7 +2780,13 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
   </div>
 )}
 
+    {/* Fin du wrapper clients */}
+    </div>
+  );
 
+  const renderPlanning = () => (
+    <div className="">
+      <PlanningComponent/>
     </div>
   );
 
@@ -3763,8 +3183,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
         )}
         {loadingInvoices && (
           <div className="mt-2 text-sm text-gray-600">Chargement des factures…</div>
-        )}
-        
+        )}      
         {/* Desktop */}
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
@@ -3947,209 +3366,6 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
   // Fermeture de la fonction renderFinance
   };
 
-  const renderAnalytics = () => (
-    <div className="space-y-4 md:space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-3 bg-blue-100 rounded-lg">
-              <Globe className="w-6 h-6 text-blue-600" />
-            </div>
-            <span className="text-xs text-green-600 font-medium">+12.5%</span>
-          </div>
-          <p className="text-sm text-gray-600 mb-1">Visiteurs uniques</p>
-          <p className="text-2xl font-bold text-gray-900">12,845</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <Activity className="w-6 h-6 text-purple-600" />
-            </div>
-            <span className="text-xs text-green-600 font-medium">+8.2%</span>
-          </div>
-          <p className="text-sm text-gray-600 mb-1">Pages vues</p>
-          <p className="text-2xl font-bold text-gray-900">45,231</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-3 bg-green-100 rounded-lg">
-              <Target className="w-6 h-6 text-green-600" />
-            </div>
-            <span className="text-xs text-green-600 font-medium">+15.3%</span>
-          </div>
-          <p className="text-sm text-gray-600 mb-1">Taux de conversion</p>
-          <p className="text-2xl font-bold text-gray-900">3.24%</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <Clock className="w-6 h-6 text-orange-600" />
-            </div>
-            <span className="text-xs text-red-600 font-medium">-2.1%</span>
-          </div>
-          <p className="text-sm text-gray-600 mb-1">Temps moyen</p>
-          <p className="text-2xl font-bold text-gray-900">4m 32s</p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-        <h3 className="text-base md:text-lg font-semibold mb-4">Sources de trafic</h3>
-        <div className="space-y-4">
-          {[
-            { source: 'Recherche organique', visits: 5420, percentage: 42, color: 'bg-blue-500' },
-            { source: 'Réseaux sociaux', visits: 3240, percentage: 25, color: 'bg-purple-500' },
-            { source: 'Direct', visits: 2680, percentage: 21, color: 'bg-green-500' },
-            { source: 'Referral', visits: 1540, percentage: 12, color: 'bg-orange-500' },
-          ].map((item, index) => (
-            <div key={index}>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-900">{item.source}</span>
-                <span className="text-sm text-gray-600">{item.visits.toLocaleString()} visites ({item.percentage}%)</span>
-              </div>
-              <div className="bg-gray-200 rounded-full h-2">
-                <div className={`${item.color} h-2 rounded-full`} style={{ width: `${item.percentage}%` }}></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-          <h3 className="text-base md:text-lg font-semibold mb-4">Appareils</h3>
-          <div className="space-y-4">
-            {[
-              { device: 'Desktop', icon: Monitor, visits: 7240, percentage: 56 },
-              { device: 'Mobile', icon: Smartphone, visits: 4580, percentage: 36 },
-              { device: 'Tablette', icon: Smartphone, visits: 1025, percentage: 8 },
-            ].map((item, index) => (
-              <div key={index} className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <item.icon className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-900">{item.device}</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-600">{item.visits.toLocaleString()}</span>
-                  <span className="text-sm font-medium text-gray-900 w-12 text-right">{item.percentage}%</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-          <h3 className="text-base md:text-lg font-semibold mb-4">Pages populaires</h3>
-          <div className="space-y-3">
-            {[
-              { page: '/services', views: 8420 },
-              { page: '/portfolio', views: 6280 },
-              { page: '/contact', views: 4150 },
-              { page: '/blog', views: 3680 },
-              { page: '/about', views: 2940 },
-            ].map((item, index) => (
-              <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                <span className="text-sm text-gray-900 font-mono">{item.page}</span>
-                <span className="text-sm font-medium text-gray-600">{item.views.toLocaleString()} vues</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderTasks = () => (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row gap-4 sm:justify-between sm:items-center">
-        <h2 className="text-xl font-bold text-gray-900">Gestion des tâches</h2>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 text-sm">
-          <Plus className="w-5 h-5" />
-          <span>Nouvelle tâche</span>
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* À faire */}
-        <div className="bg-gray-50 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">À faire</h3>
-            <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs font-medium rounded-full">8</span>
-          </div>
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white rounded-lg p-4 shadow-sm">
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="font-medium text-gray-900 text-sm">Révision design homepage</h4>
-                  <span className="text-xs text-red-600 font-medium">Haute</span>
-                </div>
-                <p className="text-xs text-gray-600 mb-3">TechStore France</p>
-                <div className="flex items-center justify-between">
-                  <div className="flex -space-x-2">
-                    <div className="w-6 h-6 bg-blue-500 rounded-full border-2 border-white"></div>
-                    <div className="w-6 h-6 bg-purple-500 rounded-full border-2 border-white"></div>
-                  </div>
-                  <span className="text-xs text-gray-500">15 Nov</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* En cours */}
-        <div className="bg-blue-50 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">En cours</h3>
-            <span className="px-2 py-1 bg-blue-200 text-blue-700 text-xs font-medium rounded-full">5</span>
-          </div>
-          <div className="space-y-3">
-            {[1, 2].map((i) => (
-              <div key={i} className="bg-white rounded-lg p-4 shadow-sm">
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="font-medium text-gray-900 text-sm">Développement API REST</h4>
-                  <span className="text-xs text-yellow-600 font-medium">Moyenne</span>
-                </div>
-                <p className="text-xs text-gray-600 mb-3">FitLife App</p>
-                <div className="flex items-center justify-between">
-                  <div className="flex -space-x-2">
-                    <div className="w-6 h-6 bg-green-500 rounded-full border-2 border-white"></div>
-                  </div>
-                  <span className="text-xs text-gray-500">20 Nov</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Terminé */}
-        <div className="bg-green-50 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-900">Terminé</h3>
-            <span className="px-2 py-1 bg-green-200 text-green-700 text-xs font-medium rounded-full">12</span>
-          </div>
-          <div className="space-y-3">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-white rounded-lg p-4 shadow-sm opacity-75">
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="font-medium text-gray-900 text-sm line-through">Migration serveur</h4>
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                </div>
-                <p className="text-xs text-gray-600 mb-3">DataViz Corp</p>
-                <div className="flex items-center justify-between">
-                  <div className="flex -space-x-2">
-                    <div className="w-6 h-6 bg-orange-500 rounded-full border-2 border-white"></div>
-                  </div>
-                  <span className="text-xs text-gray-500">10 Nov</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 
   const renderSettings = () => (
     <div className="space-y-4 md:space-y-6">
@@ -6071,18 +5287,17 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
     ); };
     switch (activeMenu) {
       case 'dashboard': return renderDashboard();
-      case 'projects': return renderProjects();
+      case 'projets': return renderProjects();
       case 'devis': return renderDevis();
       case 'appointments': return renderAppointments();
       case 'clients': return renderClients();
       case 'team': return renderTeamSecured();
       case 'finance': return renderFinance();
-      case 'analytics': return renderAnalytics();
-      case 'tasks': return renderTasks();
       case 'messages': return renderMessages();
       case 'users': return renderUsers();
       case 'contacts': return renderContacts();
       case 'settings': return renderSettings();
+      case 'planning': return renderPlanning();
       default: return renderDashboard();
     }
   };
@@ -6120,36 +5335,8 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
             );
           })}
 
-          {sidebarOpen && (
-            <div className="mt-4">
-              <div className="px-3 text-xs uppercase tracking-wide text-gray-400 mb-2">Services</div>
-              <div className="space-y-1">
-                {Array.isArray(services) && services.length > 0 ? (
-                  services.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => openEditService(s)}
-                      className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-700"
-                      title={s.title || ''}
-                    >
-                      <Package className="w-4 h-4 flex-shrink-0" />
-                      <span className="text-sm truncate">{s.title || '(Sans titre)'}</span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-3 py-2 text-xs text-gray-400">Aucun service</div>
-                )}
-              </div>
-            </div>
-          )}
+          
         </nav>
-
-        <div className="p-4 border-t border-gray-700">
-          <button className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">
-            <LogOut className="w-5 h-5" />
-            {sidebarOpen && <span className="text-sm">Déconnexion</span>}
-          </button>
-        </div>
       </aside>
 
       {/* Main content area */}

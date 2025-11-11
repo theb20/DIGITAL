@@ -169,8 +169,6 @@ function App() {
                 </RequireAuth>
               } />
              
-              
-              
             </Route>
 
             {/* Page 404 */}
@@ -192,8 +190,8 @@ function App() {
                   <Backoffice />
                 </RequireAuth_admin >
               } />
-            <Route path="/backoffice/services" element={
-                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+            <Route path="/backoffice/planning" element={
+                <RequireAuth_admin allowedRoles={['admin']}>
                   <Backoffice />
                 </RequireAuth_admin >
               } />
@@ -214,6 +212,21 @@ function App() {
               } />
             <Route path="/backoffice/parametre" element={
                 <RequireAuth_admin allowedRoles={['admin']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+            <Route path="/backoffice/invoices" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+              <Route path="/backoffice/teams" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
+              <Route path="/backoffice/projets" element={
+                <RequireAuth_admin allowedRoles={['admin', 'manager']}>
                   <Backoffice />
                 </RequireAuth_admin >
               } />

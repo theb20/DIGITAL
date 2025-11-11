@@ -27,4 +27,9 @@ export async function remove(id) {
   return res.data;
 }
 
-export default { list, get, create, update, remove };
+export async function uploadDeliverable(id, payload) {
+  const res = await api.post(`${BASE}/${id}/deliverable`, payload);
+  return res.data;
+}
+
+export default { list, get, create, update, remove, uploadDeliverable };

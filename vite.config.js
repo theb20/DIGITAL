@@ -17,12 +17,12 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'https://digital-93tz.onrender.com',
         changeOrigin: true,
         secure: false,
       },
       '/health': {
-        target: 'http://localhost:3000',
+        target: 'https://digital-93tz.onrender.com',
         changeOrigin: true,
         secure: false,
       },
