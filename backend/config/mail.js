@@ -11,8 +11,8 @@ const SMTP_USER = sanitize(process.env.SMTP_USER);
 // Remove spaces from app password if provided with spaces
 const SMTP_PASS = sanitize((process.env.SMTP_PASS || '').replace(/\s+/g, ''));
 const SMTP_FROM_EMAIL = sanitize(process.env.SMTP_FROM_EMAIL) || SMTP_USER;
-const SMTP_FROM_NAME = sanitize(process.env.SMTP_FROM_NAME) || 'Digital';
-const SUPPORT_EMAIL = sanitize(process.env.STANDARD_EMAIL || process.env.SUPPORT_EMAIL || 'support@digital.tld');
+const SMTP_FROM_NAME = sanitize(process.env.SMTP_FROM_NAME) || 'DIGITAL';
+const SUPPORT_EMAIL = sanitize(process.env.STANDARD_EMAIL || process.env.SUPPORT_EMAIL || 'ahobautfrederick@gmail.com');
 
 let transporter = null;
 

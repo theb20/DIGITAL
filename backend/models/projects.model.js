@@ -51,6 +51,9 @@ export const ensureTable = async () => {
       client VARCHAR(150) DEFAULT NULL,
       year VARCHAR(10) DEFAULT NULL,
       tags TEXT DEFAULT NULL,
+      deliverable_url TEXT DEFAULT NULL,
+      deliverable_message TEXT DEFAULT NULL,
+      deliverable_sent_at TIMESTAMP NULL DEFAULT NULL,
       is_active BOOLEAN DEFAULT TRUE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -67,6 +70,21 @@ export const ensureTable = async () => {
     "projects",
     "updated_at",
     "ALTER TABLE projects ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+  );
+  await ensureColumn(
+    "projects",
+    "deliverable_url",
+    "ALTER TABLE projects ADD COLUMN deliverable_url TEXT DEFAULT NULL"
+  );
+  await ensureColumn(
+    "projects",
+    "deliverable_message",
+    "ALTER TABLE projects ADD COLUMN deliverable_message TEXT DEFAULT NULL"
+  );
+  await ensureColumn(
+    "projects",
+    "deliverable_sent_at",
+    "ALTER TABLE projects ADD COLUMN deliverable_sent_at TIMESTAMP NULL DEFAULT NULL"
   );
 };
 
@@ -89,20 +107,23 @@ export const create = async (data) => {
     client = null,
     year = null,
     tags = null,
+    deliverable_url = null,
+    deliverable_message = null,
+    deliverable_sent_at = null,
     is_active = true,
   } = data;
 
   const result = await query(
-    `INSERT INTO projects (title, category, description, image_url, client, year, tags, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [title, category, description, image_url, client, year, normalizeTags(tags), is_active]
+    `INSERT INTO projects (title, category, description, image_url, client, year, tags, deliverable_url, deliverable_message, deliverable_sent_at, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [title, category, description, image_url, client, year, normalizeTags(tags), deliverable_url, deliverable_message, deliverable_sent_at, is_active]
   );
   return await findById(result.insertId);
 };
 
 export const update = async (id, data) => {
   const allowed = [
-    "title", "category", "description", "image_url", "client", "year", "tags", "is_active"
+    "title", "category", "description", "image_url", "client", "year", "tags", "deliverable_url", "deliverable_message", "deliverable_sent_at", "is_active"
   ];
   const fields = [];
   const params = [];

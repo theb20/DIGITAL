@@ -26,7 +26,7 @@ function normalizeFolderId(raw) {
 function assertEnv() {
   const missing = [];
   const hasServiceAccount = Boolean(GOOGLE_SA_CLIENT_EMAIL && GOOGLE_SA_PRIVATE_KEY);
-  if (!GOOGLE_DRIVE_FOLDER_ID) missing.push('GOOGLE_DRIVE_FOLDER_ID');
+  // Le folder Drive sera fourni au moment de l'upload (override) ou via env.
   if (!hasServiceAccount) {
     if (!GOOGLE_CLIENT_ID) missing.push('GOOGLE_CLIENT_ID');
     if (!GOOGLE_CLIENT_SECRET) missing.push('GOOGLE_CLIENT_SECRET');
@@ -70,6 +70,9 @@ export async function uploadPublicFile({ name, mimeType, buffer, folderId: overr
   const { drive } = getDriveClient();
   const media = { mimeType, body: Readable.from(buffer) };
   const folderId = normalizeFolderId(overrideFolderId || GOOGLE_DRIVE_FOLDER_ID);
+  if (!folderId) {
+    throw new Error('Google Drive folderId is required for upload');
+  }
   const requestBody = { name, mimeType, parents: [folderId] };
 
   const { data } = await drive.files.create({

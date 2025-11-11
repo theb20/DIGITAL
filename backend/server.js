@@ -27,8 +27,10 @@ import appointmentsRoutes from "./routes/appointments.routes.js";
 import payRoutes from "./routes/pay.routes.js";
 import mailRoutes from "./routes/mail.routes.js";
 import invoicesRoutes from "./routes/invoices.routes.js";
+import planningsRoutes from "./routes/plannings.routes.js";
 import { up as migrateAppointments } from "./scripts/add_appointments_table.js";
 import { up as migrateInvoices } from "./scripts/add_invoices_table.js";
+import { up as migratePlannings } from "./scripts/add_plannings_table.js";
 import { initRealtimeServer } from "./config/realtime.js";
 import { ensureDefaultContactSettings } from "./config/seedAppSettings.js";
 
@@ -242,6 +244,7 @@ app.use("/api/appointments", appointmentsRoutes);
 app.use("/api/pay", payRoutes);
 app.use("/api/mail", mailRoutes);
 app.use("/api/invoices", invoicesRoutes);
+app.use("/api/plannings", planningsRoutes);
 // ============================================
 // Gestion des routes non trouvées (404)
 // ============================================
@@ -354,6 +357,15 @@ const startServer = async () => {
       console.log("✅ Table invoices OK");
     } catch (migErr) {
       console.error("⚠️  Migration invoices non exécutée:", migErr?.message || migErr);
+    }
+
+    // Migration légère: assurer la table plannings
+    try {
+      console.log("🔧 Vérification/Création de la table plannings...");
+      await migratePlannings();
+      console.log("✅ Table plannings OK");
+    } catch (migErr) {
+      console.error("⚠️  Migration plannings non exécutée:", migErr?.message || migErr);
     }
 
     // Seed des paramètres système (contact)
