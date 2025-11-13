@@ -488,7 +488,7 @@ const ArticleReaderPage = ({ article, onClose, darkMode = false, relatedArticles
                     : 'prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-blue-600 prose-li:text-gray-700 prose-blockquote:border-gray-300'
                 }`}>
                   {article.content ? (
-                    <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) }} />
+                    <div className="article-content" dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) }} />
                   ) : article.excerpt ? (
                     <p className="leading-relaxed text-base sm:text-lg">{article.excerpt}</p>
                   ) : (

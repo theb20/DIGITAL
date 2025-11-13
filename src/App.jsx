@@ -230,6 +230,11 @@ function App() {
                   <Backoffice />
                 </RequireAuth_admin >
               } />
+              <Route path="/backoffice/privacy-terms" element={
+                <RequireAuth_admin allowedRoles={['admin']}>
+                  <Backoffice />
+                </RequireAuth_admin >
+              } />
             <Route path="/submission" element={
                 <RequireAuth>
                   <Submission />

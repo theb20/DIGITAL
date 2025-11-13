@@ -31,6 +31,9 @@ function Promo() {
   const [loadingAll, setLoadingAll] = useState(false);
   const [errorAll, setErrorAll] = useState(null);
   const [nowTick, setNowTick] = useState(Date.now());
+  // Paramètres d'affichage des prix
+  const [pricesInputCurrency, setPricesInputCurrency] = useState('XOF'); // 'XOF' ou 'EUR'
+  const [fxEurXof, setFxEurXof] = useState(655.957);
 
   // Fallbacks statiques
   const staticPlans = [
@@ -182,6 +185,18 @@ function Promo() {
           visible = typeof raw === 'boolean' ? raw : String(raw).toLowerCase() === 'true';
         }
         setShowPromoSection(visible);
+
+        // Charger configuration de currency et taux FX si disponibles
+        const currencySetting = Array.isArray(settingsList)
+          ? settingsList.find(s => String(s.setting_key).toUpperCase() === 'PROMO_PRICES_INPUT_CURRENCY')
+          : null;
+        const fxSetting = Array.isArray(settingsList)
+          ? settingsList.find(s => String(s.setting_key).toUpperCase() === 'FX_EUR_XOF')
+          : null;
+        const currencyValue = currencySetting ? String(currencySetting.setting_value).toUpperCase() : 'XOF';
+        setPricesInputCurrency(currencyValue === 'EUR' ? 'EUR' : 'XOF');
+        const fxValue = fxSetting ? Number(fxSetting.setting_value) : 655.957;
+        setFxEurXof(Number.isFinite(fxValue) && fxValue > 0 ? fxValue : 655.957);
       } catch {
         // En cas d'erreur, on laisse la section visible
         setShowPromoSection(true);
@@ -198,13 +213,25 @@ function Promo() {
     if (plan.custom) return null;
     if (billingCycle === 'annual') {
       // Supporte annualMonthly ou dérive de priceYearly
-      if (Number.isFinite(Number(plan.annualMonthly))) return plan.annualMonthly;
-      if (Number.isFinite(Number(plan.priceYearly))) return Math.round(Number(plan.priceYearly) / 12);
+      if (Number.isFinite(Number(plan.annualMonthly))) {
+        const base = Number(plan.annualMonthly);
+        return pricesInputCurrency === 'EUR' ? Math.round(base * fxEurXof) : base;
+      }
+      if (Number.isFinite(Number(plan.priceYearly))) {
+        const base = Math.round(Number(plan.priceYearly) / 12);
+        return pricesInputCurrency === 'EUR' ? Math.round(base * fxEurXof) : base;
+      }
       return null;
     }
     // Mensuel: monthlyPrice ou priceMonthly
-    if (Number.isFinite(Number(plan.monthlyPrice))) return Number(plan.monthlyPrice);
-    if (Number.isFinite(Number(plan.priceMonthly))) return Number(plan.priceMonthly);
+    if (Number.isFinite(Number(plan.monthlyPrice))) {
+      const base = Number(plan.monthlyPrice);
+      return pricesInputCurrency === 'EUR' ? Math.round(base * fxEurXof) : base;
+    }
+    if (Number.isFinite(Number(plan.priceMonthly))) {
+      const base = Number(plan.priceMonthly);
+      return pricesInputCurrency === 'EUR' ? Math.round(base * fxEurXof) : base;
+    }
     return null;
   };
 
@@ -403,25 +430,25 @@ function Promo() {
                     ) : (
                       <>
                         <div className="flex items-baseline gap-2 mb-2">
-                          <span className="text-5xl font-bold text-slate-900">
-                            {price}€
+                          <span className="text-3xl font-bold text-slate-900">
+          {Math.round(Number(price || 0)).toLocaleString('fr-FR')} FCFA
                           </span>
                           <span className="text-slate-600">/mois</span>
                         </div>
                         {billingCycle === 'annual' && (
                           <div className="space-y-1">
                             <p className="text-sm text-slate-600">
-                              {plan.annualPrice}€ facturé annuellement
+          {Math.round(Number(pricesInputCurrency === 'EUR' ? Number(plan.annualPrice || 0) * fxEurXof : Number(plan.annualPrice || 0))).toLocaleString('fr-FR')} FCFA facturé annuellement
                             </p>
                             <div className="inline-flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded text-xs font-semibold">
                               <Zap className="w-3 h-3" />
-                              Économie de {plan.savings}€/an
+          Économie de {Math.round(Number(pricesInputCurrency === 'EUR' ? Number(plan.savings || 0) * fxEurXof : Number(plan.savings || 0))).toLocaleString('fr-FR')} FCFA/an
                             </div>
                           </div>
                         )}
                         {plan.setupFee && (
                           <p className="text-xs text-slate-500 mt-2">
-                            + Frais de mise en service : {plan.setupFee}€ (unique)
+          + Frais de mise en service : {Math.round(Number(pricesInputCurrency === 'EUR' ? Number(plan.setupFee || 0) * fxEurXof : Number(plan.setupFee || 0))).toLocaleString('fr-FR')} FCFA (unique)
                           </p>
                         )}
                       </>

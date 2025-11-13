@@ -161,7 +161,7 @@ export default function DashboardDigital() {
     const rdvCount = appointments.filter((a) => isInRange(a.appointment_date)).length;
     const activeProjects = projects.filter((p) => p.is_active).length;
 
-    const fmtCurrency = (val) => `${Math.round(val).toLocaleString('fr-FR')} Fcfa`;
+    const fmtCurrency = (val) => `${Math.round(val).toLocaleString('fr-FR')} FCFA`;
 
     return [
       {
@@ -215,7 +215,7 @@ export default function DashboardDigital() {
   const activities = useMemo(() => {
     const items = [];
     const latestInv = invoices.slice(0, 3).map(i => ({
-      text: `Facture ${i.status || ''} (${Number(i.amount || 0).toFixed(0)} Fcfa)`,
+      text: `Facture ${i.status || ''} (${Math.round(Number(i.amount || 0)).toLocaleString('fr-FR')} FCFA)`,
       time: i.issued_date ? new Date(i.issued_date).toLocaleDateString('fr-FR') : '—',
       icon: DollarSign,
     }));

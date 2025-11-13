@@ -658,7 +658,7 @@ const [sendingDeliverable, setSendingDeliverable] = useState({});
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Total Factures</p>
-                <p className="text-3xl font-bold text-slate-800">{stats.total.toFixed(2)}€</p>
+                <p className="text-3xl font-bold text-slate-800">{Math.round(stats.total).toLocaleString('fr-FR')} FCFA</p>
               </div>
               <DollarSign className="w-12 h-12 text-gray-300" />
             </div>
@@ -668,7 +668,7 @@ const [sendingDeliverable, setSendingDeliverable] = useState({});
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">Payé</p>
-                <p className="text-3xl font-bold text-green-600">{stats.paid.toFixed(2)}€</p>
+                <p className="text-3xl font-bold text-green-600">{Math.round(stats.paid).toLocaleString('fr-FR')} FCFA</p>
               </div>
               <CheckCircle className="w-12 h-12 text-green-300" />
             </div>
@@ -678,7 +678,7 @@ const [sendingDeliverable, setSendingDeliverable] = useState({});
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-gray-600 text-sm">En attente</p>
-                <p className="text-3xl font-bold text-yellow-600">{stats.pending.toFixed(2)}€</p>
+                <p className="text-3xl font-bold text-yellow-600">{Math.round(stats.pending).toLocaleString('fr-FR')} FCFA</p>
               </div>
               <Clock className="w-12 h-12 text-yellow-300" />
             </div>
@@ -758,7 +758,7 @@ const [sendingDeliverable, setSendingDeliverable] = useState({});
                     <input
                       type="number"
                       step="0.01"
-                      placeholder="Montant (€) *"
+                      placeholder="Montant (FCFA) *"
                       value={formData.amount}
                       onChange={(e) => setFormData({...formData, amount: e.target.value})}
                       className="px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-slate-800 focus:outline-none"
@@ -848,7 +848,7 @@ const [sendingDeliverable, setSendingDeliverable] = useState({});
                             <p className="text-sm text-gray-600">N° {invoice.invoiceNumber}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-2xl font-bold text-gray-900">{invoice.amount.toFixed(2)}€</p>
+                          <p className="text-2xl font-bold text-gray-900">{Math.round(Number(invoice.amount || 0)).toLocaleString('fr-FR')} FCFA</p>
                             {invoice.dueDate && (
                               <p className="text-xs text-gray-600 flex items-center gap-1 justify-end">
                                 <Calendar className="w-3 h-3" />
@@ -920,7 +920,7 @@ const [sendingDeliverable, setSendingDeliverable] = useState({});
                             <p className="text-sm text-gray-600 mb-2">Client: {project.client}</p>
                             <div className="flex items-center gap-2 text-sm text-gray-700">
                               <DollarSign className="w-4 h-4" />
-                              <span className="font-semibold">{project.budget.toFixed(2)}€</span>
+                              <span className="font-semibold">{Math.round(Number(project.budget || 0)).toLocaleString('fr-FR')} FCFA</span>
                               <span className="text-gray-400">•</span>
                               <Calendar className="w-4 h-4" />
                               <span>{new Date(project.startDate).toLocaleDateString()}</span>

@@ -141,7 +141,7 @@ const AuthPage = () => {
             />
 
             {error && (
-              <div className="text-red-600 text-sm">
+              <div className="text-red-600 text-center text-sm">
                 {error}
               </div>
             )}

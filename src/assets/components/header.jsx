@@ -230,7 +230,7 @@ const Header = () => {
                                   <div className="flex space-x-5 xl:space-x-8 2xl:space-x-10 font-medium text-sm xl:text-base text-slate-700">
                                     <a href="/" className="hover:text-slate-900 transition-colors whitespace-nowrap">Accueil</a>
                                     <a href="/blog" className="hover:text-slate-900 transition-colors whitespace-nowrap">Blog</a>
-                                    <a href="/portfolio" className="hover:text-slate-900 transition-colors whitespace-nowrap">Porfolio</a>
+                                    <a href="/services" className="hover:text-slate-900 transition-colors whitespace-nowrap">Services</a>
                                     <a href="/contact" className="hover:text-slate-900 transition-colors whitespace-nowrap">Contact</a>
                                   </div>
                               </nav>
@@ -394,7 +394,7 @@ const Header = () => {
                     </div>
                 </div>
             </>) }  
-            <style jsx>{`
+            <style>{`
               @keyframes marquee {
                 0% { transform: translateX(0%); }
                 100% { transform: translateX(-50%); }

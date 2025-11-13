@@ -8,7 +8,7 @@ function decodeGoogleIdToken(idToken) {
     if (parts.length !== 3) throw new Error('Token JWT invalide');
     const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
     return payload;
-  } catch (e) {
+  } catch (_E) {
     throw new Error('Impossible de décoder le token Google');
   }
 }
@@ -61,6 +61,11 @@ export async function loginWithGoogle(idToken) {
     const res = await api.get(`/users/email/${encodeURIComponent(email)}`);
     const existing = res.data;
     if (existing && existing.id) {
+      // Si le compte est inactif, bloquer la connexion et afficher un message explicite
+      const isActive = existing.is_active === true || Number(existing.is_active) === 1;
+      if (!isActive) {
+        throw new Error('Votre compte est suspendu. Veuillez contacter le support technique.');
+      }
       await api.put(`/users/${existing.id}`, {
         session_status: 'connected',
         last_login: formatMySQLDate(new Date()),

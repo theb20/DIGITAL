@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { Home, Users, ShoppingCart, FileText, Settings, LogOut, Menu, X, TrendingUp, DollarSign, Package, Search, Bell, ChevronDown, Eye, Edit, Trash2, Plus, Calendar, CreditCard, Activity, Award, Mail, Phone, MapPin, Filter, Download, Upload, Save, Send, Star, Clock, CheckCircle, XCircle, AlertCircle, Zap, Target, BarChart3, PieChart as PieChartIcon, TrendingDown, RefreshCw, Globe, Smartphone, Monitor, FileJson, FileSpreadsheet, Lock, ArrowLeft, DivideSquare, ChartGantt } from 'lucide-react';
+import { Home, Users, ShoppingCart, FileText, Settings, LogOut, Menu, X, TrendingUp, DollarSign, Package, Search, Bell, ChevronDown, Eye, Edit, Trash2, Plus, Calendar, CreditCard, Activity, Award, Mail, Phone, MapPin, Filter, Download, Upload, ShieldCheck, Save, Send, Star, Clock, CheckCircle, XCircle, AlertCircle, Zap, Target, BarChart3, PieChart as PieChartIcon, TrendingDown, RefreshCw, Globe, Smartphone, Monitor, FileJson, FileSpreadsheet, Lock, ArrowLeft, DivideSquare, ChartGantt } from 'lucide-react';
 import serviceCategoriesApi from '../configurations/services/serviceCategories.js';
 import servicesApi from '../configurations/services/services.js';
 import devisRequestsApi from '../configurations/services/devisRequests.js';
@@ -24,6 +24,7 @@ import contactApi from '../configurations/services/contact.js';
 import PlanningComponent from '../components/planning.jsx';
 import DashboardComponent from '../components/Dashboard.jsx';
 import ComponentProjets from '../components/Project.jsx';
+import PrivacyTerms from '../components/PrivacyTerms.jsx'
 import { connectRealtime } from '../configurations/realtime.js';
 
 const BackofficeDigital = () => {
@@ -69,7 +70,7 @@ const BackofficeDigital = () => {
       closeUserMenu();
     }
   };
-  const [dateRange, setDateRange] = useState('30days');
+  const [_dateRange, _setDateRange] = useState('30days');
   const [activeTab, setActiveTab] = useState("Profil");
 
   // Sidebar droite (panneau sortant)
@@ -291,7 +292,7 @@ const BackofficeDigital = () => {
           </div>
           {usersTableError && <div className="mt-2 text-sm text-red-600">{usersTableError}</div>}
         </div>
-        <div className="p-6">
+        <div className="p-6 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-100 text-gray-700">
@@ -405,7 +406,6 @@ const BackofficeDigital = () => {
       }).length;
       setUnreadCount(count);
     } catch (e) {
-      console.warn('Notifications: échec du chargement:', e?.message || e);
       setNotifications([]);
       setUnreadCount(0);
     }
@@ -429,8 +429,9 @@ const BackofficeDigital = () => {
   // Promos (CRUD dans Paramètres)
   const [promos, setPromos] = useState([]);
   const [promoLoading, setPromoLoading] = useState(false);
-  const [promoError, setPromoError] = useState(null);
-  const [promoFormOpen, setPromoFormOpen] = useState(false);
+const [promoError, setPromoError] = useState(null);
+const [promoFormOpen, setPromoFormOpen] = useState(false);
+// Aperçu image retiré: pas d'état d'erreur nécessaire
   const [promoFormData, setPromoFormData] = useState({
     id: null,
     title: '',
@@ -444,16 +445,19 @@ const BackofficeDigital = () => {
     is_active: 1,
   });
   // Champs JSON en mode "raw" pour une saisie libre et validation progressive
-  const [promoJsonRaw, setPromoJsonRaw] = useState({
-    plans_json: '[]',
-    comparison_json: '[]',
-    enterprise_features_json: '[]',
-  });
-  const [promoJsonErrors, setPromoJsonErrors] = useState({
-    plans_json: null,
-    comparison_json: null,
-    enterprise_features_json: null,
-  });
+const [promoJsonRaw, setPromoJsonRaw] = useState({
+  plans_json: '[]',
+  comparison_json: '[]',
+  enterprise_features_json: '[]',
+});
+const [promoJsonErrors, setPromoJsonErrors] = useState({
+  plans_json: null,
+  comparison_json: null,
+  enterprise_features_json: null,
+});
+// JSON combiné pour simplification (plans, comparison, enterprise_features)
+const [promoCombinedRaw, setPromoCombinedRaw] = useState('');
+const [promoCombinedError, setPromoCombinedError] = useState(null);
 
   // App Settings (CRUD dans Paramètres)
   const [appSettings, setAppSettings] = useState([]);
@@ -610,6 +614,28 @@ const BackofficeDigital = () => {
     try { JSON.parse(str); return true; } catch { return false; }
   };
 
+  // Validation légère: vérifier que les champs de prix des plans sont numériques
+  const validatePlansPriceFCFA = (plans) => {
+    try {
+      if (!Array.isArray(plans)) return null;
+      for (const p of plans) {
+        const monthly = p?.monthlyPrice ?? p?.priceMonthly ?? null;
+        const annual  = p?.annualPrice ?? p?.priceYearly ?? p?.annualMonthly ?? null;
+        if (monthly != null && !Number.isFinite(Number(monthly))) {
+          return 'Prix mensuel non numérique détecté dans Plans';
+        }
+        if (annual != null && !Number.isFinite(Number(annual))) {
+          return 'Prix annuel non numérique détecté dans Plans';
+        }
+      }
+      return null;
+    } catch {
+      return 'Erreur de validation des prix des plans';
+    }
+  };
+
+  
+
   const loadPromos = async () => {
     setPromoLoading(true);
     setPromoError(null);
@@ -688,23 +714,25 @@ const BackofficeDigital = () => {
     }
   }, [activeTab]);
 
-  const openCreatePromo = () => {
-    setPromoFormData({
-      id: null,
-      title: '',
-      subtitle: '',
-      img_url: '',
-      billing_cycle_default: 'annual',
-      timer_end_at: '',
-      plans_json: [],
-      comparison_json: [],
-      enterprise_features_json: [],
-      is_active: 1,
-    });
-    setPromoJsonRaw({ plans_json: '[]', comparison_json: '[]', enterprise_features_json: '[]' });
-    setPromoJsonErrors({ plans_json: null, comparison_json: null, enterprise_features_json: null });
-    setPromoFormOpen(true);
-  };
+const openCreatePromo = () => {
+  setPromoFormData({
+    id: null,
+    title: '',
+    subtitle: '',
+    img_url: '',
+    billing_cycle_default: 'annual',
+    timer_end_at: '',
+    plans_json: [],
+    comparison_json: [],
+    enterprise_features_json: [],
+    is_active: 1,
+  });
+  setPromoJsonRaw({ plans_json: '[]', comparison_json: '[]', enterprise_features_json: '[]' });
+  setPromoJsonErrors({ plans_json: null, comparison_json: null, enterprise_features_json: null });
+  setPromoCombinedRaw(JSON.stringify({ plans: [], comparison: [], enterprise_features: [] }, null, 2));
+  setPromoCombinedError(null);
+  setPromoFormOpen(true);
+};
 
   const openCreateAppSetting = () => {
     setAppSettingFormData({
@@ -866,15 +894,15 @@ const BackofficeDigital = () => {
     }
   };
 
-  const openEditPromo = (p) => {
-    const safeParse = (v) => {
-      if (Array.isArray(v)) return v;
-      if (typeof v === 'string') {
-        try { const j = JSON.parse(v); return Array.isArray(j) ? j : []; } catch { return []; }
-      }
-      return [];
-    };
-    setPromoFormData({
+const openEditPromo = (p) => {
+  const safeParse = (v) => {
+    if (Array.isArray(v)) return v;
+    if (typeof v === 'string') {
+      try { const j = JSON.parse(v); return Array.isArray(j) ? j : []; } catch { return []; }
+    }
+    return [];
+  };
+  setPromoFormData({
       id: p.id,
       title: p.title || '',
       subtitle: p.subtitle || '',
@@ -885,15 +913,21 @@ const BackofficeDigital = () => {
       comparison_json: safeParse(p.comparison_json),
       enterprise_features_json: safeParse(p.enterprise_features_json),
       is_active: p.is_active ? 1 : 0,
-    });
-    setPromoJsonRaw({
-      plans_json: JSON.stringify(safeParse(p.plans_json), null, 2),
-      comparison_json: JSON.stringify(safeParse(p.comparison_json), null, 2),
-      enterprise_features_json: JSON.stringify(safeParse(p.enterprise_features_json), null, 2),
-    });
-    setPromoJsonErrors({ plans_json: null, comparison_json: null, enterprise_features_json: null });
-    setPromoFormOpen(true);
-  };
+  });
+  setPromoJsonRaw({
+    plans_json: JSON.stringify(safeParse(p.plans_json), null, 2),
+    comparison_json: JSON.stringify(safeParse(p.comparison_json), null, 2),
+    enterprise_features_json: JSON.stringify(safeParse(p.enterprise_features_json), null, 2),
+  });
+  setPromoJsonErrors({ plans_json: null, comparison_json: null, enterprise_features_json: null });
+  setPromoCombinedRaw(JSON.stringify({
+    plans: safeParse(p.plans_json),
+    comparison: safeParse(p.comparison_json),
+    enterprise_features: safeParse(p.enterprise_features_json)
+  }, null, 2));
+  setPromoCombinedError(null);
+  setPromoFormOpen(true);
+};
 
   const savePromo = async () => {
     try {
@@ -997,7 +1031,7 @@ const BackofficeDigital = () => {
       // Recharge depuis la base pour refléter la mise à jour réelle
       await loadTeamMembers();
     } catch (e) {
-      console.error('Erreur mise à jour utilisateur:', e?.message || e);
+      // Silencieux: échec mise à jour utilisateur
     } finally {
       closeTeamEdit();
     }
@@ -1086,7 +1120,6 @@ const BackofficeDigital = () => {
       await devisRequestsApi.update(id, { status: nextStatus });
       setDevisRequests((prev) => prev.map((d) => (d?.id === id ? { ...d, status: nextStatus } : d)));
     } catch (e) {
-      console.error('Erreur mise à jour devis:', e?.message || e);
       setDevisError(e?.message || 'Impossible de mettre à jour le statut du devis');
     } finally {
       setUpdatingDevisId(null);
@@ -1121,7 +1154,6 @@ const BackofficeDigital = () => {
       const rows = await devisRequestsApi.list();
       setDevisRequests(Array.isArray(rows) ? rows : []);
     } catch (e) {
-      console.error('Erreur chargement devis:', e?.message || e);
       setDevisError(e?.message || 'Erreur de chargement des devis');
     } finally {
       setDevisLoading(false);
@@ -1206,7 +1238,7 @@ const BackofficeDigital = () => {
   }, []);
 
   // Données Analytics
-  const revenueData = [
+  const _revenueData = [
     { month: 'Jan', revenus: 45000, depenses: 28000, profit: 17000 },
     { month: 'Fév', revenus: 52000, depenses: 31000, profit: 21000 },
     { month: 'Mar', revenus: 48000, depenses: 29000, profit: 19000 },
@@ -1256,22 +1288,13 @@ const BackofficeDigital = () => {
     return { totalRevenue, pendingAmount, unpaidCount, overdueAmount, yoyDeltaPct };
   };
 
-  const trafficData = [
-    { day: 'Lun', visitors: 1240, pageviews: 3420, conversions: 45 },
-    { day: 'Mar', visitors: 1580, pageviews: 4120, conversions: 62 },
-    { day: 'Mer', visitors: 1820, pageviews: 4850, conversions: 71 },
-    { day: 'Jeu', visitors: 1650, pageviews: 4320, conversions: 58 },
-    { day: 'Ven', visitors: 2100, pageviews: 5680, conversions: 89 },
-    { day: 'Sam', visitors: 980, pageviews: 2150, conversions: 34 },
-    { day: 'Dim', visitors: 750, pageviews: 1680, conversions: 28 },
-  ];
-
-  const clientsData = [
-    { segment: 'Entreprises', value: 4200, color: '#3b82f6' },
-    { segment: 'PME', value: 3100, color: '#8b5cf6' },
-    { segment: 'Startups', value: 2800, color: '#ec4899' },
-    { segment: 'Indépendants', value: 1900, color: '#10b981' },
-  ];
+ 
+  // Helper: convert value to ISO date (YYYY-MM-DD) safely
+  const toISODate = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  };
 
   const [projects, setProjects] = useState([]);
   const mapUserToProject = (u) => ({
@@ -1281,7 +1304,7 @@ const BackofficeDigital = () => {
     statut: (u.session_status === 'connected' || u.is_active) ? 'Actif' : 'Inactif',
     progression: 0,
     budget: '—',
-    deadline: (u.created_at ? new Date(u.created_at).toISOString().slice(0,10) : ''),
+    deadline: toISODate(u.created_at),
     priorite: 'Moyenne',
   });
   useEffect(() => {
@@ -1289,13 +1312,9 @@ const BackofficeDigital = () => {
       try {
         const res = await api.get('/users');
         const list = Array.isArray(res.data) ? res.data : [];
-        console.info('[Backoffice] Chargé /users pour Projects:', {
-          length: list.length,
-          baseURL: api?.defaults?.baseURL,
-        });
         setProjects(list.map(mapUserToProject));
       } catch (e) {
-        console.warn('Backoffice: échec du chargement des utilisateurs', e?.message || e);
+        // Silencieux: échec du chargement des utilisateurs
       }
     };
     loadUsers();
@@ -1312,10 +1331,7 @@ const BackofficeDigital = () => {
     projets: extra.requestsCount ?? '—',
     valeur: '—',
     statut: (u.session_status === 'connected' || u.is_active || (extra.requestsCount && extra.requestsCount > 0)) ? 'Actif' : 'Inactif',
-    depuis: (extra.lastRequestAt
-      ? new Date(extra.lastRequestAt).toISOString().slice(0,10)
-      : (u.created_at ? new Date(u.created_at).toISOString().slice(0,10) : '')
-    ),
+    depuis: extra.lastRequestAt ? toISODate(extra.lastRequestAt) : toISODate(u.created_at),
   });
   useEffect(() => {
     const loadClients = async () => {
@@ -1326,12 +1342,7 @@ const BackofficeDigital = () => {
         ]);
       const usersArr = Array.isArray(users) ? users : [];
       const reqArr = Array.isArray(requests) ? requests : [];
-      console.info('[Backoffice] Clients - users & devisRequests:', {
-        users: usersArr.length,
-        requests: reqArr.length,
-        baseURL: api?.defaults?.baseURL,
-      });
-
+      
       // Conserver toutes les demandes de devis pour le panneau client
       setAllDevisRequests(reqArr);
 
@@ -1367,15 +1378,13 @@ const BackofficeDigital = () => {
               projets: info.count,
               valeur: '—',
               statut: 'Actif',
-              depuis: info.lastRequestAt ? new Date(info.lastRequestAt).toISOString().slice(0,10) : '',
+              depuis: toISODate(info.lastRequestAt),
             });
           }
         }
-
-        console.info('[Backoffice] Clients dérivés:', { total: clientsList.length });
         setClients(clientsList);
       } catch (e) {
-        console.warn('Backoffice: échec du chargement des clients', e?.message || e);
+        // Silencieux: échec du chargement des clients
       }
     };
     loadClients();
@@ -1408,7 +1417,7 @@ const BackofficeDigital = () => {
         });
       setTeamMembers(adminsManagers);
     } catch (e) {
-      console.warn('Backoffice: échec du chargement des membres de l\'équipe', e?.message || e);
+      // Silencieux: échec du chargement des membres de l'équipe
       setTeamMembers([]);
     }
   };
@@ -1416,20 +1425,20 @@ const BackofficeDigital = () => {
   useEffect(() => { loadTeamMembers(); }, []);
 
   // Paiements (Finance)
-  const [paymentsTable, setPaymentsTable] = useState([]);
-  const [paymentsLoading, setPaymentsLoading] = useState(false);
-  const [paymentsError, setPaymentsError] = useState('');
+  const [_paymentsTable, _setPaymentsTable] = useState([]);
+  const [_paymentsLoading, _setPaymentsLoading] = useState(false);
+  const [_paymentsError, _setPaymentsError] = useState('');
 
   const loadPaymentsTable = async () => {
     try {
-      setPaymentsLoading(true);
-      setPaymentsError('');
+      _setPaymentsLoading(true);
+      _setPaymentsError('');
       const rows = await payApi.list();
-      setPaymentsTable(Array.isArray(rows) ? rows : []);
+      _setPaymentsTable(Array.isArray(rows) ? rows : []);
     } catch (e) {
-      setPaymentsError(e?.message || 'Erreur chargement des paiements');
+      _setPaymentsError(e?.message || 'Erreur chargement des paiements');
     } finally {
-      setPaymentsLoading(false);
+      _setPaymentsLoading(false);
     }
   };
 
@@ -1494,7 +1503,9 @@ const BackofficeDigital = () => {
   // Helpers affichage factures
   const formatEuro = (n) => {
     const num = typeof n === 'number' ? n : Number(n);
-    return Number.isFinite(num) ? num.toLocaleString('fr-FR', { style: 'currency', currency: 'XOF' }) : (n ?? '—');
+    return Number.isFinite(num)
+      ? `${Math.round(num).toLocaleString('fr-FR')} FCFA`
+      : (n ?? '—');
   };
   const fmtDate = (s) => {
     if (!s) return '—';
@@ -1525,7 +1536,6 @@ const BackofficeDigital = () => {
       const rows = await serviceCategoriesApi.list();
       setServiceCategories(Array.isArray(rows) ? rows : []);
     } catch (e) {
-      console.error('Erreur chargement catégories:', e?.message || e);
       setCategoryError(e?.message || 'Erreur de chargement');
     } finally {
       setLoadingCategories(false);
@@ -1601,6 +1611,8 @@ const BackofficeDigital = () => {
     original_price: '',
     discount: '',
     is_active: true,
+    features_raw: '',
+    deliverables_raw: '',
   });
 
   // Filtres avancés et sélection de masse
@@ -1897,7 +1909,6 @@ const BackofficeDigital = () => {
       const rows = await servicesApi.list();
       setServices(Array.isArray(rows) ? rows : []);
     } catch (e) {
-      console.error('Erreur chargement services:', e?.message || e);
       setServiceError(e?.message || 'Erreur de chargement');
     } finally {
       setLoadingServices(false);
@@ -1928,6 +1939,8 @@ const BackofficeDigital = () => {
       original_price: '',
       discount: '',
       is_active: true,
+      features_raw: '',
+      deliverables_raw: '',
     });
     setServiceFormOpen(true);
   };
@@ -1955,6 +1968,8 @@ const BackofficeDigital = () => {
       is_active: Boolean(svc.is_active),
       created_at: svc.created_at || '',
       updated_at: svc.updated_at || '',
+      features_raw: Array.isArray(svc.features) ? svc.features.join('\n') : '',
+      deliverables_raw: Array.isArray(svc.deliverables) ? svc.deliverables.join('\n') : '',
     });
     setServiceFormOpen(true);
   };
@@ -1983,6 +1998,16 @@ const BackofficeDigital = () => {
         discount: serviceFormData.discount === '' || serviceFormData.discount === null ? null : Number(serviceFormData.discount),
         is_active: Boolean(serviceFormData.is_active),
       };
+      const featuresArr = (serviceFormData.features_raw || '')
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean);
+      const deliverablesArr = (serviceFormData.deliverables_raw || '')
+        .split('\n')
+        .map(s => s.trim())
+        .filter(Boolean);
+      if (featuresArr.length > 0) payload.features = featuresArr;
+      if (deliverablesArr.length > 0) payload.deliverables = deliverablesArr;
       if (!payload.title) throw new Error('Le titre est requis');
       if (!payload.category_id) throw new Error('La catégorie est requise');
       if (serviceFormData.id) {
@@ -2039,6 +2064,7 @@ const BackofficeDigital = () => {
     { id: 'team', name: 'Équipe', icon: Award, path: '/backoffice/teams' },
     { id: 'finance', name: 'Finance', icon: DollarSign, path: '/backoffice/invoices' },
     { id: 'planning', name: 'Emploi du temps', icon: ChartGantt, path: '/backoffice/planning' },
+    { id: 'privacy-terms', name: 'Confidentialité et termes', icon: ShieldCheck, path: '/backoffice/privacy-terms' },
     { id: 'settings', name: 'Paramètres', icon: Settings, path: '/backoffice/parametre' },
   ];
 
@@ -2055,6 +2081,7 @@ const BackofficeDigital = () => {
     else if (p.includes('/backoffice/clients')) setActiveMenu('clients');
     else if (p.includes('/backoffice/teams')) setActiveMenu('team');
     else if (p.includes('/backoffice/invoices')) setActiveMenu('finance');
+    else if (p.includes('/backoffice/privacy-terms')) setActiveMenu('privacy-terms');
     else if (p.includes('/backoffice/planning')) setActiveMenu('planning');
     else setActiveMenu('dashboard');
   }, [location.pathname]);
@@ -2085,7 +2112,7 @@ const BackofficeDigital = () => {
     return colors[statut] || 'bg-gray-100 text-gray-800';
   };
 
-  const getPriorityColor = (priorite) => {
+  const _getPriorityColor = (priorite) => {
     const colors = {
       'Haute': 'text-red-600',
       'Moyenne': 'text-yellow-600',
@@ -2227,6 +2254,11 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
     }
   };
 
+  const renderPrivacy = () => (
+    <div className="space-y-6">
+      <PrivacyTerms />
+    </div>
+  );
   const deleteMessage = async (id) => {
     if (!confirm('Supprimer ce message ?')) return;
     try {
@@ -2315,7 +2347,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
             const source = applyGlobalFilters(messages || []);
             const groups = buildGroups(source, groupMode);
             return groups.map((g) => (
-              <div key={(g.header?.key)||'all'} className="border-t">
+              <div key={(g.header?.key)||'all'} className="border-t overflow-x-auto">
                 {g.header && (
                   <div className="bg-gray-50 px-3 py-2 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -2387,7 +2419,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
           <div className="absolute inset-0 bg-black/40" onClick={() => setMessageFormOpen(false)} />
           <div className="relative bg-white rounded-xl shadow-xl p-6 w-[92%] max-w-2xl">
             <h4 className="text-lg font-semibold mb-4">{messageFormData.id ? 'Modifier le message' : 'Nouveau message'}</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Objet</label>
                 <input type="text" value={messageFormData.subject} onChange={(e)=>setMessageFormData(d=>({...d,subject:e.target.value}))} className="w-full px-3 py-2 border rounded-lg" />
@@ -2434,10 +2466,10 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
  );
 
   // État et handlers pour CRUD Projets
-  const [projectSearch, setProjectSearch] = useState('');
-  const [projectStatusFilter, setProjectStatusFilter] = useState('');
-  const [projectPriorityFilter, setProjectPriorityFilter] = useState('');
-  const [projectFormOpen, setProjectFormOpen] = useState(false);
+  const [_projectSearch, _setProjectSearch] = useState('');
+  const [_projectStatusFilter, _setProjectStatusFilter] = useState('');
+  const [_projectPriorityFilter, _setProjectPriorityFilter] = useState('');
+  const [_projectFormOpen, setProjectFormOpen] = useState(false);
   const [projectFormData, setProjectFormData] = useState({
     id: null,
     nom: '',
@@ -2462,21 +2494,21 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
 
   const nextProjectId = () => (projects.length ? Math.max(...projects.map(p => p.id)) + 1 : 1);
 
-  const handleAddProject = () => {
+  const _handleAddProject = () => {
     resetProjectForm();
     setProjectFormOpen(true);
   };
 
-  const handleEditProject = (project) => {
+  const _handleEditProject = (project) => {
     setProjectFormData(project);
     setProjectFormOpen(true);
   };
 
-  const handleDeleteProject = (id) => {
+  const _handleDeleteProject = (id) => {
     setProjects(prev => prev.filter(p => p.id !== id));
   };
 
-  const handleSaveProject = () => {
+  const _handleSaveProject = () => {
     if (!projectFormData.nom || !projectFormData.client) return;
     if (projectFormData.id == null) {
       const newProject = { ...projectFormData, id: nextProjectId() };
@@ -3399,7 +3431,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
 
               {profilesError && <div className="text-red-600">{profilesError}</div>}
 
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50">
@@ -3493,7 +3525,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
               </div>
 
               {promoError && <div className="text-red-600">{promoError}</div>}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50">
@@ -3526,112 +3558,100 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
               </div>
 
               {promoFormOpen && (
-                <div className="bg-slate-50 border rounded-xl p-4 space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-500 mb-1">Titre</label>
-                      <input value={promoFormData.title} onChange={e=>setPromoFormData({...promoFormData, title: e.target.value})} className="w-full p-2 border rounded" />
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                  <div className="bg-white rounded-xl shadow-lg w-full max-w-6xl h-full max-h-[90vh] p-6 space-y-6 overflow-y-auto">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-semibold">{promoFormData.id ? 'Éditer la promo' : 'Nouvelle promo'}</h4>
+                      <button onClick={()=>setPromoFormOpen(false)} className="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs">Fermer</button>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-500 mb-1">Cycle de facturation par défaut</label>
-                      <select value={promoFormData.billing_cycle_default} onChange={e=>setPromoFormData({...promoFormData, billing_cycle_default: e.target.value})} className="w-full p-2 border rounded">
-                        <option value="monthly">Mensuel</option>
-                        <option value="annual">Annuel</option>
-                      </select>
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-medium text-slate-500 mb-1">Image URL</label>
-                      <input value={promoFormData.img_url} onChange={e=>setPromoFormData({...promoFormData, img_url: e.target.value})} className="w-full p-2 border rounded" placeholder="https://exemple.com/image.jpg" />
-                      {promoFormData.img_url && (
-                        <div className="mt-2">
-                          <img src={promoFormData.img_url} alt="Aperçu" className="h-24 rounded object-cover border" />
+
+                    <div className="grid grid-cols-1 gap-6">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <label className="block text-xs font-medium text-slate-500">Titre</label>
+                          <input value={promoFormData.title} onChange={e=>setPromoFormData({...promoFormData, title: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
                         </div>
-                      )}
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-medium text-slate-500 mb-1">Sous-titre</label>
-                      <textarea value={promoFormData.subtitle} onChange={e=>setPromoFormData({...promoFormData, subtitle: e.target.value})} className="w-full p-2 border rounded" rows={2} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-500 mb-1">Fin d'offre (datetime)</label>
-                      <input type="datetime-local" value={promoFormData.timer_end_at} onChange={e=>setPromoFormData({...promoFormData, timer_end_at: e.target.value})} className="w-full p-2 border rounded" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-500 mb-1">Active</label>
-                      <select value={promoFormData.is_active} onChange={e=>setPromoFormData({...promoFormData, is_active: e.target.value})} className="w-full p-2 border rounded">
-                        <option value={1}>Oui</option>
-                        <option value={0}>Non</option>
-                      </select>
-                    </div>
-                  </div>
+                        <div className="space-y-2">
+                          <label className="block text-xs font-medium text-slate-500">Sous-titre</label>
+                          <textarea value={promoFormData.subtitle} onChange={e=>setPromoFormData({...promoFormData, subtitle: e.target.value})} className="w-full px-3 py-2 border rounded-lg" rows={2} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-xs font-medium text-slate-500">Image URL</label>
+                          <input 
+                            value={promoFormData.img_url}
+                            onChange={e=>setPromoFormData({...promoFormData, img_url: e.target.value})}
+                            className="w-full px-3 py-2 border rounded-lg" placeholder="https://exemple.com/image.jpg" />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="block text-xs font-medium text-slate-500">Cycle par défaut</label>
+                            <select value={promoFormData.billing_cycle_default} onChange={e=>setPromoFormData({...promoFormData, billing_cycle_default: e.target.value})} className="w-full px-3 py-2 border rounded-lg">
+                              <option value="monthly">Mensuel</option>
+                              <option value="annual">Annuel</option>
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <label className="text-xs font-medium text-slate-500">Active</label>
+                            <input type="checkbox" checked={!!Number(promoFormData.is_active)} onChange={e=>setPromoFormData({...promoFormData, is_active: e.target.checked ? 1 : 0})} />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="block text-xs font-medium text-slate-500">Fin d'offre</label>
+                          <input type="datetime-local" value={promoFormData.timer_end_at} onChange={e=>setPromoFormData({...promoFormData, timer_end_at: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                        </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Plans (JSON)</label>
-                    <textarea
-                      value={promoJsonRaw.plans_json}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setPromoJsonRaw({ ...promoJsonRaw, plans_json: val });
-                        if (isValidJsonArray(val)) {
-                          setPromoJsonErrors({ ...promoJsonErrors, plans_json: null });
-                          setPromoFormData({ ...promoFormData, plans_json: JSON.parse(val) });
-                        } else {
-                          setPromoJsonErrors({ ...promoJsonErrors, plans_json: 'JSON invalide (doit être un tableau)' });
-                        }
-                      }}
-                      className={`w-full p-2 border rounded font-mono text-xs ${promoJsonErrors.plans_json ? 'border-red-400' : ''}`}
-                      rows={8}
-                    />
-                    {promoJsonErrors.plans_json && (
-                      <div className="mt-1 text-xs text-red-600">{promoJsonErrors.plans_json}</div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Comparaison (JSON)</label>
-                    <textarea
-                      value={promoJsonRaw.comparison_json}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setPromoJsonRaw({ ...promoJsonRaw, comparison_json: val });
-                        if (isValidJsonArray(val)) {
-                          setPromoJsonErrors({ ...promoJsonErrors, comparison_json: null });
-                          setPromoFormData({ ...promoFormData, comparison_json: JSON.parse(val) });
-                        } else {
-                          setPromoJsonErrors({ ...promoJsonErrors, comparison_json: 'JSON invalide (doit être un tableau)' });
-                        }
-                      }}
-                      className={`w-full p-2 border rounded font-mono text-xs ${promoJsonErrors.comparison_json ? 'border-red-400' : ''}`}
-                      rows={6}
-                    />
-                    {promoJsonErrors.comparison_json && (
-                      <div className="mt-1 text-xs text-red-600">{promoJsonErrors.comparison_json}</div>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Features Entreprise (JSON)</label>
-                    <textarea
-                      value={promoJsonRaw.enterprise_features_json}
-                      onChange={e => {
-                        const val = e.target.value;
-                        setPromoJsonRaw({ ...promoJsonRaw, enterprise_features_json: val });
-                        if (isValidJsonArray(val)) {
-                          setPromoJsonErrors({ ...promoJsonErrors, enterprise_features_json: null });
-                          setPromoFormData({ ...promoFormData, enterprise_features_json: JSON.parse(val) });
-                        } else {
-                          setPromoJsonErrors({ ...promoJsonErrors, enterprise_features_json: 'JSON invalide (doit être un tableau)' });
-                        }
-                      }}
-                      className={`w-full p-2 border rounded font-mono text-xs ${promoJsonErrors.enterprise_features_json ? 'border-red-400' : ''}`}
-                      rows={6}
-                    />
-                    {promoJsonErrors.enterprise_features_json && (
-                      <div className="mt-1 text-xs text-red-600">{promoJsonErrors.enterprise_features_json}</div>
-                    )}
-                  </div>
+                        <details className="bg-slate-50 border rounded-lg p-3">
+                          <summary className="cursor-pointer text-xs font-semibold text-slate-700">Plans & Comparaison (avancé)</summary>
+                          <div className="mt-3 space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">Données promo (JSON combiné)</label>
+                              <textarea
+                                value={promoCombinedRaw}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setPromoCombinedRaw(val);
+                                  try {
+                                    const obj = JSON.parse(val);
+                                    const plans = Array.isArray(obj?.plans) ? obj.plans : [];
+                                    const comp = Array.isArray(obj?.comparison) ? obj.comparison : [];
+                                    const ent  = Array.isArray(obj?.enterprise_features) ? obj.enterprise_features : [];
+                                    const priceErr = validatePlansPriceFCFA(plans);
+                                    setPromoCombinedError(null);
+                                    setPromoJsonErrors({ plans_json: null, comparison_json: null, enterprise_features_json: null, plans_price: priceErr });
+                                    setPromoJsonRaw({
+                                      plans_json: JSON.stringify(plans, null, 2),
+                                      comparison_json: JSON.stringify(comp, null, 2),
+                                      enterprise_features_json: JSON.stringify(ent, null, 2),
+                                    });
+                                    setPromoFormData({
+                                      ...promoFormData,
+                                      plans_json: plans,
+                                      comparison_json: comp,
+                                      enterprise_features_json: ent,
+                                    });
+                                  } catch (_ERR) {
+                                    void _ERR;
+                                    setPromoCombinedError('JSON invalide (objet attendu: { plans, comparison, enterprise_features })');
+                                  }
+                                }}
+                                className={`w-full p-2 border rounded font-mono text-xs ${promoCombinedError ? 'border-red-400' : ''}`}
+                                rows={10}
+                              />
+                              {promoCombinedError && (<div className="mt-1 text-xs text-red-600">{promoCombinedError}</div>)}
+                              {promoJsonErrors.plans_price && (<div className="mt-1 text-xs text-orange-600">{promoJsonErrors.plans_price}</div>)}
+                              <div className="text-[11px] text-slate-500 mt-2">Format attendu: {`{"plans":[], "comparison":[], "enterprise_features":[]}`}</div>
+                            </div>
+                          </div>
+                        </details>
+                      </div>
 
-                  <div className="flex items-center gap-2">
-                    <button onClick={savePromo} className="px-4 py-2 bg-blue-600 text-white rounded">Enregistrer</button>
-                    <button onClick={()=>setPromoFormOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded">Annuler</button>
+                      
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={savePromo} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Enregistrer</button>
+                      <button onClick={()=>setPromoFormOpen(false)} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg">Annuler</button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -3649,7 +3669,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
               </div>
 
               {blogsError && <div className="text-red-600">{blogsError}</div>}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50">
@@ -3771,7 +3791,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
               </div>
 
               {portfolioError && <div className="text-red-600">{portfolioError}</div>}
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-slate-50">
@@ -4098,7 +4118,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
               </div>
             )}
 
-            <div className="border rounded-xl overflow-hidden">
+            <div className="border rounded-xl overflow-visible">
               {loadingServices ? (
                 <div className="p-4 text-sm text-gray-600">Chargement des services…</div>
               ) : (
@@ -4149,7 +4169,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
               <td className="px-4 py-3 text-gray-700">{s.duration}</td>
 
               <td className="px-4 py-3 text-gray-700">
-                {s.price != null ? `${s.price} Fcfa` : ""}
+            {s.price != null ? `${Math.round(Number(s.price)).toLocaleString('fr-FR')} FCFA` : ""}
               </td>
 
               <td className="px-4 py-3 text-gray-700">{s.price_type}</td>
@@ -4279,7 +4299,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
                       <p className="mt-1 text-xs text-gray-500">Indiquez une durée lisible (ex: 10 jours, 2h).</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Prix (€)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Prix (FCFA)</label>
                       <input
                         type="number"
                         step="0.01"
@@ -4338,6 +4358,26 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
                         placeholder="Détails du service"
                       />
                       <p className="mt-1 text-xs text-gray-500">Décrivez succinctement le contenu et les livrables.</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Caractéristiques (une par ligne)</label>
+                      <textarea
+                        rows="4"
+                        value={serviceFormData.features_raw}
+                        onChange={(e) => setServiceFormData(d => ({ ...d, features_raw: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Ex: Design responsive\nSuivi analytics\nOptimisation performance"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Livrables (un par ligne)</label>
+                      <textarea
+                        rows="4"
+                        value={serviceFormData.deliverables_raw}
+                        onChange={(e) => setServiceFormData(d => ({ ...d, deliverables_raw: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Ex: Site en ligne\nDocumentation\nAccès au code source"
+                      />
                     </div>
                     <div className="md:col-span-2 flex items-center gap-2">
                       <input
@@ -4422,7 +4462,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Prix d’origine (€)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Prix d’origine (FCFA)</label>
                       <input
                         type="number"
                         step="0.01"
@@ -4693,7 +4733,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Montant min (€)</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Montant min (FCFA)</label>
             <input
               type="number"
               min="0"
@@ -4704,7 +4744,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Montant max (Fcfa)</label>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Montant max (FCFA)</label>
             <input
               type="number"
               min="0"
@@ -5296,6 +5336,7 @@ useEffect(() => { if (activeMenu === 'finance') { loadPaymentsTable(); loadInvoi
       case 'messages': return renderMessages();
       case 'users': return renderUsers();
       case 'contacts': return renderContacts();
+      case 'privacy-terms': return renderPrivacy();
       case 'settings': return renderSettings();
       case 'planning': return renderPlanning();
       default: return renderDashboard();

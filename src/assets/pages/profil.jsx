@@ -160,7 +160,7 @@ export default function ClientProfile() {
                         </div>
                         <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">Accepté</span>
                       </div>
-                      <p className="text-sm text-slate-500 mt-2">Montant: 2 500 €</p>
+        <p className="text-sm text-slate-500 mt-2">Montant: 2 500 FCFA</p>
                     </div>
                     <div className="bg-dark dark:bg-slate-700 p-4 rounded-lg dark:border-slate-700 border border-slate-200">
                       <div className="flex justify-between items-start">
@@ -170,7 +170,7 @@ export default function ClientProfile() {
                         </div>
                         <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-1 rounded">En attente</span>
                       </div>
-                      <p className="text-sm text-slate-500 mt-2">Montant: 8 000 €</p>
+        <p className="text-sm text-slate-500 mt-2">Montant: 8 000 FCFA</p>
                     </div>
                     <div className="bg-dark dark:bg-slate-700 p-4 rounded-lg dark:border-slate-700 border border-slate-200">
                       <div className="flex justify-between items-start">
@@ -180,7 +180,7 @@ export default function ClientProfile() {
                         </div>
                         <span className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">Refusé</span>
                       </div>
-                      <p className="text-sm text-slate-500 mt-2">Montant: 12 000 €</p>
+        <p className="text-sm text-slate-500 mt-2">Montant: 12 000 FCFA</p>
                     </div>
                   </div>
                 </div>
@@ -199,7 +199,7 @@ export default function ClientProfile() {
                         </div>
                         <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">Payé</span>
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Montant: 99 €</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Montant: 99 FCFA</p>
                     </div>
                     <div className="bg-dark dark:bg-slate-700 p-4 rounded-lg dark:border-slate-700 border border-slate-200">
                       <div className="flex justify-between items-start">
@@ -210,7 +210,7 @@ export default function ClientProfile() {
                         </div>
                         <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded">Payé</span>
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Montant: 99 €</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Montant: 99 FCFA</p>
                     </div>
                     <div className="bg-dark dark:bg-slate-700 p-4 rounded-lg dark:border-slate-700 border border-slate-200">
                       <div className="flex justify-between items-start">
@@ -221,7 +221,7 @@ export default function ClientProfile() {
                         </div>
                         <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded">À venir</span>
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Montant: 99 €</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">Montant: 99 FCFA</p>
                     </div>
                   </div>
                 </div>

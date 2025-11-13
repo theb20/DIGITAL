@@ -139,8 +139,8 @@ const handleServiceClick = async (service) => {
     const priceType = (svc.price_type || '').toLowerCase();
     const n = toNumberOrNull(svc.price);
     if (priceType === 'sur_devis' || n === 0) return 'Sur devis';
-    if (n !== null) return `${n} Fcfa`;
-    if (typeof svc.price === 'string' && svc.price.trim()) return `${svc.price} Fcfa`;
+  if (n !== null) return `${Math.round(Number(n)).toLocaleString('fr-FR')} FCFA`;
+  if (typeof svc.price === 'string' && svc.price.trim()) return `${Math.round(Number(svc.price)).toLocaleString('fr-FR')} FCFA`;
     return 'Sur devis';
   };
 
@@ -165,13 +165,15 @@ const handleServiceClick = async (service) => {
             </p>
             <div className="flex flex-wrap gap-4">
               <button 
-                onClick={() => setShowProposalForm(true)}
+                onClick={() => navigate('/submission')}
                 className="px-6 py-3 bg-dark text-dark font-semibold rounded hover:bg-dark/90 transition-colors inline-flex items-center gap-2"
               >
                 Soumettre un projet
                 <ArrowRight className="w-4 h-4" />
               </button>
-              <button className="px-6 py-3 border-2 border-gray-300 text-white font-semibold rounded hover:border-white/30 hover:text-black hover:bg-white transition-colors inline-flex items-center gap-2">
+              <button 
+                onClick={() => navigate('/rendezvous')}
+              className="px-6 py-3 border-2 border-gray-300 text-white font-semibold rounded hover:border-white/30 hover:text-black hover:bg-white transition-colors inline-flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
                 Prendre rendez-vous
               </button>
