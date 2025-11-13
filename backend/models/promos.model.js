@@ -6,6 +6,7 @@ export const ensureTable = async () => {
       id INT AUTO_INCREMENT PRIMARY KEY,
       title VARCHAR(255) NULL,
       subtitle TEXT NULL,
+      img_url VARCHAR(1024) NULL,
       billing_cycle_default ENUM('annual','monthly') NOT NULL DEFAULT 'annual',
       timer_end_at DATETIME NULL,
       plans_json JSON NOT NULL,
@@ -16,6 +17,12 @@ export const ensureTable = async () => {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )
   `);
+  // Ajoute la colonne img_url si la table existante ne la contient pas déjà
+  try {
+    await query(`ALTER TABLE promos ADD COLUMN img_url VARCHAR(1024) NULL`);
+  } catch (_) {
+    // Ignore si la colonne existe déjà
+  }
 };
 
 export const findAll = async () => {
@@ -36,6 +43,7 @@ export const create = async (data) => {
   const {
     title = null,
     subtitle = null,
+    img_url = null,
     billing_cycle_default = 'annual',
     timer_end_at = null,
     plans_json,
@@ -44,11 +52,12 @@ export const create = async (data) => {
     is_active = 1,
   } = data;
 
-  const sql = `INSERT INTO promos (title, subtitle, billing_cycle_default, timer_end_at, plans_json, comparison_json, enterprise_features_json, is_active)
-               VALUES (?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?)`;
+  const sql = `INSERT INTO promos (title, subtitle, img_url, billing_cycle_default, timer_end_at, plans_json, comparison_json, enterprise_features_json, is_active)
+               VALUES (?, ?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?)`;
   const result = await query(sql, [
     title,
     subtitle,
+    img_url,
     billing_cycle_default,
     timer_end_at,
     JSON.stringify(plans_json),
@@ -66,6 +75,7 @@ export const update = async (id, data) => {
   const {
     title = current.title,
     subtitle = current.subtitle,
+    img_url = current.img_url,
     billing_cycle_default = current.billing_cycle_default,
     timer_end_at = current.timer_end_at,
     plans_json = current.plans_json,
@@ -77,6 +87,7 @@ export const update = async (id, data) => {
   const sql = `UPDATE promos SET 
     title = ?,
     subtitle = ?,
+    img_url = ?,
     billing_cycle_default = ?,
     timer_end_at = ?,
     plans_json = CAST(? AS JSON),
@@ -88,6 +99,7 @@ export const update = async (id, data) => {
   await query(sql, [
     title,
     subtitle,
+    img_url,
     billing_cycle_default,
     timer_end_at,
     JSON.stringify(plans_json),

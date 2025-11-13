@@ -72,6 +72,7 @@ const LOCAL_IP = getLocalIP();
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
+  "http://192.168.1.195:3001",
   "https://digital-company.web.app",
   "http://127.0.0.1:3001",
   `http://${LOCAL_IP}:3000`,

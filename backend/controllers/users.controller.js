@@ -74,7 +74,21 @@ export const create = async (req, res, next) => {
 
 export const update = async (req, res, next) => {
   try {
-    const updated = await Users.update(Number(req.params.id), req.body);
+    const userId = Number(req.params.id);
+    const body = req.body || {};
+
+    // Bloquer la connexion si le compte est inactif
+    if (String(body.session_status || '').toLowerCase() === 'connected') {
+      try {
+        const existing = await Users.findById(userId);
+        const isActive = existing && (existing.is_active === true || Number(existing.is_active) === 1);
+        if (!isActive) {
+          return res.status(403).json({ error: "Votre compte est suspendu. Veuillez contacter le support technique." });
+        }
+      } catch (_) { /* si lecture échoue, on laisse la mise à jour gérer l'erreur */ }
+    }
+
+    const updated = await Users.update(userId, body);
     if (!updated) return res.status(404).json({ error: "User not found" });
     // Poser/renouveler le cookie HttpOnly pour le token si fourni
     const idToken = req.body?.idToken || req.body?.id_token;

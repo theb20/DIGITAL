@@ -102,11 +102,12 @@ export async function seedExample() {
     is_active: 1,
   };
 
-  const sql = `INSERT INTO promos (title, subtitle, billing_cycle_default, timer_end_at, plans_json, comparison_json, enterprise_features_json, is_active)
-               VALUES (?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?)`;
+  const sql = `INSERT INTO promos (title, subtitle, img_url, billing_cycle_default, timer_end_at, plans_json, comparison_json, enterprise_features_json, is_active)
+               VALUES (?, ?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), CAST(? AS JSON), ?)`;
   await query(sql, [
     example.title,
     example.subtitle,
+    example.img_url || null,
     example.billing_cycle_default,
     example.timer_end_at,
     example.plans_json,

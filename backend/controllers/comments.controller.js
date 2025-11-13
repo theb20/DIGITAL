@@ -27,8 +27,14 @@ export const create = async (req, res, next) => {
 
 export const update = async (req, res, next) => {
   try {
-    const updated = await Model.update(Number(req.params.id), req.body);
-    if (!updated) return res.status(404).json({ error: "Comment not found" });
+    const id = Number(req.params.id);
+    const existing = await Model.findById(id);
+    if (!existing) return res.status(404).json({ error: "Comment not found" });
+    const userId = req.body && Number(req.body.user_id);
+    if (!userId || existing.user_id !== userId) {
+      return res.status(403).json({ error: "forbidden", message: "Seul l’auteur peut modifier ce commentaire." });
+    }
+    const updated = await Model.update(id, req.body);
     res.json(updated);
   } catch (e) { next(e); }
 };

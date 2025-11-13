@@ -96,24 +96,68 @@ export const ensureReactionsTable = async () => {
 };
 
 export const findAll = async () => {
-  return await query("SELECT * FROM comments ORDER BY created_at DESC");
+  return await query(
+    `SELECT c.*, 
+            COALESCE(
+              NULLIF(CONCAT_WS(' ', NULLIF(TRIM(u.first_name), ''), NULLIF(TRIM(u.last_name), '')), ''),
+              NULLIF(TRIM(u.name), ''),
+              NULLIF(TRIM(u.first_name), ''),
+              NULLIF(TRIM(u.email), '')
+            ) AS author_name,
+            u.avatar AS avatar_url
+     FROM comments c
+     LEFT JOIN users u ON u.id = c.user_id
+     ORDER BY c.created_at DESC`
+  );
 };
 
 export const findById = async (id) => {
-  const rows = await query("SELECT * FROM comments WHERE id = ?", [id]);
+  const rows = await query(
+    `SELECT c.*, 
+            COALESCE(
+              NULLIF(CONCAT_WS(' ', NULLIF(TRIM(u.first_name), ''), NULLIF(TRIM(u.last_name), '')), ''),
+              NULLIF(TRIM(u.name), ''),
+              NULLIF(TRIM(u.email), '')
+            ) AS author_name,
+            u.avatar AS avatar_url
+     FROM comments c
+     LEFT JOIN users u ON u.id = c.user_id
+     WHERE c.id = ?`,
+    [id]
+  );
   return rows[0] || null;
 };
 
 export const findByBlogId = async (blogId) => {
   return await query(
-    "SELECT * FROM comments WHERE blog_id = ? ORDER BY created_at DESC",
+    `SELECT c.*, 
+            COALESCE(
+              NULLIF(CONCAT_WS(' ', NULLIF(TRIM(u.first_name), ''), NULLIF(TRIM(u.last_name), '')), ''),
+              NULLIF(TRIM(u.name), ''),
+              NULLIF(TRIM(u.email), '')
+            ) AS author_name,
+            u.avatar AS avatar_url
+     FROM comments c
+     LEFT JOIN users u ON u.id = c.user_id
+     WHERE c.blog_id = ?
+     ORDER BY c.created_at DESC`,
     [blogId]
   );
 };
 
 export const findByServiceId = async (serviceId) => {
   return await query(
-    "SELECT * FROM comments WHERE service_id = ? ORDER BY created_at DESC",
+    `SELECT c.*, 
+            COALESCE(
+              NULLIF(CONCAT_WS(' ', NULLIF(TRIM(u.first_name), ''), NULLIF(TRIM(u.last_name), '')), ''),
+              NULLIF(TRIM(u.name), ''),
+              NULLIF(TRIM(u.email), '')
+            ) AS author_name,
+            u.avatar AS avatar_url
+     FROM comments c
+     LEFT JOIN users u ON u.id = c.user_id
+     WHERE c.service_id = ?
+     ORDER BY c.created_at DESC`,
     [serviceId]
   );
 };

@@ -140,6 +140,18 @@ export const ensureTable = async () => {
     "ALTER TABLE services ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
   );
 
+  // Champs de contenu structurés pour la fiche service
+  await ensureColumn(
+    "services",
+    "features",
+    "ALTER TABLE services ADD COLUMN features TEXT DEFAULT NULL"
+  );
+  await ensureColumn(
+    "services",
+    "deliverables",
+    "ALTER TABLE services ADD COLUMN deliverables TEXT DEFAULT NULL"
+  );
+
   // Index
   await ensureIndex(
     "services",
@@ -148,13 +160,33 @@ export const ensureTable = async () => {
   );
 };
 
+// Helper: parse JSON safe en tableau
+function parseJsonArray(raw) {
+  try {
+    if (raw == null) return [];
+    const v = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(v) ? v : [];
+  } catch { return []; }
+}
+
 export const findAll = async () => {
-  return await query("SELECT * FROM services ORDER BY created_at DESC");
+  const rows = await query("SELECT * FROM services ORDER BY created_at DESC");
+  return (rows || []).map(r => ({
+    ...r,
+    features: parseJsonArray(r.features),
+    deliverables: parseJsonArray(r.deliverables),
+  }));
 };
 
 export const findById = async (id) => {
   const rows = await query("SELECT * FROM services WHERE id = ?", [id]);
-  return rows[0] || null;
+  const r = rows[0] || null;
+  if (!r) return null;
+  return {
+    ...r,
+    features: parseJsonArray(r.features),
+    deliverables: parseJsonArray(r.deliverables),
+  };
 };
 
 export const create = async (data) => {
@@ -177,19 +209,23 @@ export const create = async (data) => {
     image_url = null,
     cover_url = null,
     is_active = true,
+    features = [],
+    deliverables = [],
   } = data;
 
   const result = await query(
     `INSERT INTO services 
      (category_id, title, description, duration, price, price_type,
       featured, rating, review_count, provider, provider_rating, in_stock, guarantee, original_price, discount,
-      image_url, cover_url, is_active)
+      image_url, cover_url, is_active, features, deliverables)
      VALUES (?, ?, ?, ?, ?, ?,
              ?, ?, ?, ?, ?, ?, ?, ?, ?,
-             ?, ?, ?)`,
+             ?, ?, ?, ?, ?)`,
     [category_id, title, description, duration, price, price_type,
      featured, rating, review_count, provider, provider_rating, in_stock, guarantee, original_price, discount,
-     image_url, cover_url, is_active]
+     image_url, cover_url, is_active,
+     (Array.isArray(features) ? JSON.stringify(features) : (features ?? null)),
+     (Array.isArray(deliverables) ? JSON.stringify(deliverables) : (deliverables ?? null))]
   );
 
   return await findById(result.insertId);
@@ -200,7 +236,7 @@ export const update = async (id, data) => {
     "category_id", "title", "description", "duration",
     "price", "price_type",
     "featured", "rating", "review_count", "provider", "provider_rating", "in_stock", "guarantee", "original_price", "discount",
-    "image_url", "cover_url", "is_active"
+    "image_url", "cover_url", "is_active", "features", "deliverables"
   ];
   const fields = [];
   const params = [];
@@ -208,7 +244,11 @@ export const update = async (id, data) => {
   for (const key of allowed) {
     if (data[key] !== undefined) {
       fields.push(`${key} = ?`);
-      params.push(data[key]);
+      let value = data[key];
+      if (key === 'features' || key === 'deliverables') {
+        value = Array.isArray(value) || typeof value === 'object' ? JSON.stringify(value) : (value ?? null);
+      }
+      params.push(value);
     }
   }
   if (fields.length === 0) return await findById(id);
